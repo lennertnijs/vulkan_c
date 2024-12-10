@@ -19,7 +19,7 @@ void destroy_window(GLFWwindow* window) {
 }
 
 VkInstance create_vulkan_instance() {
-    // optional, but helps with optimalisation
+    // optional, but helps with optimisation
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "Vulkan";
@@ -50,7 +50,7 @@ void destroy_vulkan_instance(VkInstance instance) {
 
 int main(){
     GLFWwindow* window = create_window();
-    const VkInstance vk_instance = create_vulkan_instance();
+    VkInstance vk_instance = create_vulkan_instance();
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
     }
