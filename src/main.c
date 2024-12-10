@@ -1,8 +1,9 @@
-#include <vulkan.h>
-#include <glfw3.h>
+#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+const char* validation_layer = {"VK_LAYER_KHRONOS_validation"};
 
 GLFWwindow* create_window() {
     glfwInit();
