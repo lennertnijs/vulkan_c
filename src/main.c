@@ -118,6 +118,24 @@ VkPhysicalDevice* pick_physical_device(VkInstance instance){
 	return NULL;	
 }
 
+
+
+uint32_t find_graphics_queue_family(VkPhysicalDevice* physical_device){
+	uint32_t queue_family_count = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &queue_family_count, NULL);
+	VkQueueFamilyProperties* queue_families_properties = malloc(sizeof(VkQueueFamilyProperties) * queue_family_count);
+	vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &queue_family_count, queue_families_properties);
+
+	for(int i = 0; i < queue_family_count; i++){
+		if(queue_families_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
+			free(queue_families_properties);
+			return i;
+		}
+	}
+	free(queue_families_properties);
+	return UINT32_MAX;
+}
+
 int main(){
     GLFWwindow* window = create_window();
 	if(window == NULL){
