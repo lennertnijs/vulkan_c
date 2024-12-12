@@ -3,58 +3,81 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
-const int enable_validation_layers = 1;
+#define SUCCESS 1
+#define FAILURE 0
+
+#ifdef DEBUG
+	#define log(msg) printf("%s\n", msg)
+	const bool enable_validation_layers = true;
+#else
+	#define log(msg)
+	const bool enable_validation_layers = false;
+#endif
+
 const int validation_layer_count = 1;
 const char* validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
 
-GLFWwindow* create_window() {
-    if(glfwInit() == 0){
-		printf("Glfw context initialisation failed.\n");
-		return NULL;
-	};
+typedef struct {
+	GLFWwindow* window;
+	VkInstance instance;
+	VkSurfaceKHR surface;
+	VkPhysicalDevice physical_device;
+	uint32_t graphics_queue_index;
+	uint32_t present_queue_index;
+	VkDevice logical_device;
+	VkQueue graphics_queue;
+	VkQueue present_queue;
+} VkContext;
+
+int create_window(VkContext* context) {
+	if(context == NULL){
+		log("Cannot create glfw window: vulkan context is NULL.");
+		return FAILURE;
+	}
     // dont use openGL
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
 	if(window == NULL){
-		printf("Glfw window creation failed.\n");
-		glfwTerminate();
-		return NULL;
+		log("Glfw window creation failed.");
+		return FAILURE;
 	}
-	return window;
+	context->window = window;
+	log("Glfw window creation succesful!");
+	return SUCCESS;
 }
 
-void destroy_window(GLFWwindow* window) {
-    glfwDestroyWindow(window);
-    glfwTerminate();
-}
-
-int supports_validation_layer(){
+bool supports_validation_layer(){
     uint32_t supported_layer_count = 0;
     vkEnumerateInstanceLayerProperties(&supported_layer_count, NULL);
     VkLayerProperties* supported_layers_list = malloc(sizeof(VkLayerProperties) * supported_layer_count);
     vkEnumerateInstanceLayerProperties(&supported_layer_count, supported_layers_list);
     
     for(int i = 0; i < validation_layer_count; i++){
-		int  layer_supported = 0;
-		for(int j = 0; j < supported_layer_count; j++){
+		bool  layer_supported = false;
+		for(uint32_t j = 0; j < supported_layer_count; j++){
 			if(strcmp(validation_layers[i], supported_layers_list[j].layerName) == 0){
-				layer_supported = 1;
+				layer_supported = true;
 				break;
 			}
 		}
-		if(layer_supported == 0){
-			return 0;
+		if(!layer_supported){
+			return false;
 		}
     }
-    return 1;
+    return true;
 }
 
-VkInstance create_vulkan_instance() {
-	if(enable_validation_layers != 0 && supports_validation_layer() == 0){
-		printf("Validation layers are not supported.\n");
-		return NULL;
+int create_vk_instance(VkContext *context) {
+	if(context == NULL){
+		log("Cannot create vulkan instance: vulkan context is NULL.");
+		return FAILURE;
+	}
+	if(enable_validation_layers && !supports_validation_layer()){
+		log("Validation layers are enabled, but not supported.");
+		return FAILURE;
 	}
     // optional, but helps with optimisation
     VkApplicationInfo app_info = {};
@@ -73,7 +96,7 @@ VkInstance create_vulkan_instance() {
     const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
     create_info.enabledExtensionCount = glfw_extension_count;
     create_info.ppEnabledExtensionNames = glfw_extensions;
-	if(enable_validation_layers != 0){
+	if(enable_validation_layers){
 		create_info.enabledLayerCount = validation_layer_count;
 		create_info.ppEnabledLayerNames = validation_layers;
 	}else{
@@ -81,23 +104,37 @@ VkInstance create_vulkan_instance() {
 	}
     VkInstance instance;
     if(vkCreateInstance(&create_info, NULL, &instance) != VK_SUCCESS) {
-        return NULL;
+		log("Vulkan instance creation failed.");
+        return FAILURE;
     }
-    return instance;
+	context->instance = instance;
+  	log("Vulkan instance creation succesful!");
+	 return SUCCESS;
 }
 
-void destroy_vulkan_instance(VkInstance instance) {
-    vkDestroyInstance(instance, NULL);
+int create_surface(VkContext *context){
+	if(context == NULL){
+		log("Cannot create surface: vulkan context is NULL.");
+		return FAILURE;
+	}
+	VkSurfaceKHR surface;
+	if(glfwCreateWindowSurface(context->instance, context-> window, NULL, &surface) != VK_SUCCESS){
+		log("Surface creation failed.");
+		return FAILURE;
+	}
+	context->surface = surface;
+	log("Surface creation succesful!");
+	return SUCCESS;
 }
 
 
-uint32_t find_graphics_queue_family(VkPhysicalDevice physical_device){
+uint32_t find_graphics_queue(VkPhysicalDevice physical_device){
 	uint32_t queue_family_count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, NULL);
 	VkQueueFamilyProperties* queue_families_properties = malloc(sizeof(VkQueueFamilyProperties) * queue_family_count);
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families_properties);
 
-	for(int i = 0; i < queue_family_count; i++){
+	for(uint32_t i = 0; i < queue_family_count; i++){
 		if(queue_families_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
 			free(queue_families_properties);
 			return i;
@@ -107,42 +144,62 @@ uint32_t find_graphics_queue_family(VkPhysicalDevice physical_device){
 	return UINT32_MAX;
 }
 
-int is_suitable_physical_device(VkPhysicalDevice physical_device){
-	if(physical_device == NULL){
-		return 0;
+uint32_t find_present_queue(VkSurfaceKHR surface, VkPhysicalDevice physical_device){
+	uint32_t queue_family_count = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, NULL);
+	VkQueueFamilyProperties* queue_family_properties = malloc(sizeof(VkQueueFamilyProperties) * queue_family_count);
+	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_family_properties);
+	
+	VkBool32 supports_presenting = false;
+	for(uint32_t i = 0; i < queue_family_count; i++){
+		vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &supports_presenting);
+		if(supports_presenting){
+			free(queue_family_properties);
+			return i;
+		}
 	}
-	uint32_t graphics_queue_index  = find_graphics_queue_family(physical_device);
-	if(graphics_queue_index == UINT32_MAX){
-		return 0;
-	}
-	return 1;
+	free(queue_family_properties);
+	return UINT32_MAX;
 }
 
-VkPhysicalDevice pick_physical_device(VkInstance instance){
-	// is implicitly destroyed with the vkInstance
+int pick_physical_device(VkContext *context){
+	if(context == NULL){
+		log("Cannot pick a physical device: vulkan context is NULL.");
+		return FAILURE;
+	}
 	uint32_t physical_device_count = 0;
-	vkEnumeratePhysicalDevices(instance, &physical_device_count, NULL);
+	vkEnumeratePhysicalDevices(context->instance, &physical_device_count, NULL);
 	if(physical_device_count == 0){
-		return NULL;
+		log("No physical devices available.");
+		return FAILURE;
 	}
 	VkPhysicalDevice* physical_devices = malloc(sizeof(VkPhysicalDevice) * physical_device_count);
-	vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices);
+	vkEnumeratePhysicalDevices(context->instance, &physical_device_count, physical_devices);
 	for(uint32_t i = 0; i < physical_device_count; i++){
-		if(is_suitable_physical_device(physical_devices[i]) == 1){
-			VkPhysicalDevice suitable_device = physical_devices[i];
+		uint32_t graphics_queue_index = find_graphics_queue(physical_devices[i]);
+		uint32_t present_queue_index = find_present_queue(context->surface, physical_devices[i]);
+		if(graphics_queue_index != UINT32_MAX && present_queue_index != UINT32_MAX){
+			context->physical_device = physical_devices[i];
+			context->graphics_queue_index = graphics_queue_index;
+			context->present_queue_index = present_queue_index;
 			free(physical_devices);
-			return suitable_device;
+			log("Physical device picked succesful!.");
+			return SUCCESS;
 		}
 	}
 	free(physical_devices);
-	return NULL;	
+	log("No suitable physical device found.");
+	return FAILURE;	
 }
 
-VkDevice create_logical_device(VkPhysicalDevice physical_device){
-	uint32_t graphics_queue_family_index = find_graphics_queue_family(physical_device);
+int create_logical_device(VkContext *context){
+	if(context == NULL){
+		log("Cannot create a logical device: vulkan context is NULL.");
+		return FAILURE;
+	}
 	VkDeviceQueueCreateInfo queue_create_info = {};
 	queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queue_create_info.queueFamilyIndex = graphics_queue_family_index;
+	queue_create_info.queueFamilyIndex = context-> graphics_queue_index;
 	queue_create_info.queueCount = 1;
 	float queue_priority = 1.0f;
 	queue_create_info.pQueuePriorities = &queue_priority;
@@ -156,60 +213,123 @@ VkDevice create_logical_device(VkPhysicalDevice physical_device){
 	create_info.pEnabledFeatures = &device_features;
 	// in modern vulkan, it is unnecesary, but usefull for old vulkan
 	create_info.enabledExtensionCount = 0;
-	if(enable_validation_layers != 0){
+	if(enable_validation_layers){
 		create_info.enabledLayerCount = validation_layer_count;
 		create_info.ppEnabledLayerNames = validation_layers;
 	}else{
 		create_info.enabledLayerCount = 0;
 	}
 	VkDevice logical_device;
-	if(vkCreateDevice(physical_device, &create_info, NULL, &logical_device) != VK_SUCCESS){
-		return NULL;
+	if(vkCreateDevice(context->physical_device, &create_info, NULL, &logical_device) != VK_SUCCESS){
+		log("Logical device creation failed.");
+		return FAILURE;
 	}
-	return logical_device;
+	context->logical_device = logical_device;
+	log("Logical device creation succesful!");
+	return SUCCESS;
 }
 
-void destroy_logical_device(VkDevice logical_device){
-	if(logical_device == NULL){
+int set_graphics_queue(VkContext *context){
+	if(context == NULL){
+		log("Cannot set the graphics queue: vulkan context is NULL.");
+		return FAILURE;
+	}	
+	VkQueue graphics_queue;
+	vkGetDeviceQueue(context->logical_device, context-> graphics_queue_index, 0, &graphics_queue);
+	if(graphics_queue == NULL){
+		log("Setting the graphics queue failed.");
+		return FAILURE;
+	}
+	context->graphics_queue = graphics_queue;
+	log("Set the graphics queue succesfully!");
+	return SUCCESS;
+}
+
+int set_present_queue(VkContext *context){
+	if(context == NULL){
+		log("Cannot set the present queue: vulkan context is NULL.");
+		return FAILURE;
+	}
+	VkQueue present_queue;
+	vkGetDeviceQueue(context->logical_device, context->present_queue_index, 0, &present_queue);
+	if(present_queue == NULL){
+		log("Setting the present queue failed.");
+		return FAILURE;
+	}
+	context->present_queue = present_queue;
+	log("Set the present queue succesfully!");
+	return SUCCESS;
+}
+
+
+void cleanup_vk_context(VkContext *context){
+	if(context == NULL){
+		log("Cannot clean up: vulkan context is NULL.");
 		return;
 	}
-	vkDestroyDevice(logical_device, NULL);
+	if(context->logical_device != NULL){			
+		vkDestroyDevice(context->logical_device, NULL);
+		log("Destroyed the logical device.");
+	}
+	if(context->surface != NULL){	
+		vkDestroySurfaceKHR(context->instance, context->surface, NULL);
+		log("Destroyed the surface.");
+	}
+	if(context->instance != NULL){
+		vkDestroyInstance(context->instance, NULL);
+		log("Destroyed the vulkan instance.");
+	}
+	if(context->window != NULL){
+    	glfwDestroyWindow(context->window);
+		log("Destroyed the glfw window.");
+	}
+}
+
+
+bool initialise_vulkan_context(VkContext *context){
+	if(context == NULL){
+		log("Cannot initialise vulkan context: vulkan context struct is NULL.");
+		return false;
+	}
+	if(create_window(context) == FAILURE){
+		return false;
+	}
+	if(create_vk_instance(context) == FAILURE){
+		return false;
+	}
+	if(create_surface(context) == FAILURE){
+		return false;
+	}
+	if(pick_physical_device(context) == FAILURE){
+		return false;
+	}
+	if(create_logical_device(context) == FAILURE){
+		return false;
+	}
+	if(set_graphics_queue(context) == FAILURE){
+		return false;
+	}
+	if(set_present_queue(context) == FAILURE){
+		return false;
+	}
+	return true;
 }
 
 int main(){
-    GLFWwindow* window = create_window();
-	if(window == NULL){
-		return 0;
-	}
-	printf("Window creation succesful!\n");
-    VkInstance vk_instance = create_vulkan_instance();
-	if(vk_instance == NULL){
-		destroy_window(window);
-		return 0;
-	}
-	printf("Vulkan instance creation succesful!\n");
-	VkPhysicalDevice physical_device = pick_physical_device(vk_instance);
-	if(physical_device == NULL){
-		destroy_vulkan_instance(vk_instance);
-		destroy_window(window);
-		return 0;
-	}
-	printf("Physical device selection succesful!\n");
-	
-	VkDevice logical_device = create_logical_device(physical_device);
-	if(logical_device == NULL){
-		destroy_vulkan_instance(vk_instance);
-		destroy_window(window);
-		return 0;
-	}
-	printf("Logical device creation succesful!\n");
+	glfwInit();
 
-    while(!glfwWindowShouldClose(window)) {
+	VkContext context = {};
+	if(!initialise_vulkan_context(&context)){
+		cleanup_vk_context(&context);
+		glfwTerminate();
+		return 1;
+	}
+	while(!glfwWindowShouldClose(context.window)) {
         glfwPollEvents();
     }
-	destroy_logical_device(logical_device);
-	destroy_vulkan_instance(vk_instance);
-    destroy_window(window);
-    return 1;
+	cleanup_vk_context(&context);
+	
+	glfwTerminate();
+    return 0;
 }
 
