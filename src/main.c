@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #define SUCCESS 1
 #define FAILURE 0
@@ -35,16 +36,13 @@ typedef struct {
 } VkContext;
 
 int create_window(VkContext* context) {
-	// dont use openGL
+	assert(context != NULL);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    GLFWwindow *window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
-	if(window == NULL){
-		log("Glfw window creation failed.");
+    context->window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
+	if(context->window == NULL){
 		return FAILURE;
 	}
-	context->window = window;
-	log("Glfw window creation succesful!");
 	return SUCCESS;
 }
 
@@ -70,8 +68,8 @@ bool supports_validation_layer(){
 }
 
 int create_vk_instance(VkContext *context) {
+	assert(context != NULL);
 	if(enable_validation_layers && !supports_validation_layer()){
-		log("Validation layers are enabled, but not supported.");
 		return FAILURE;
 	}
     // optional, but helps with optimisation
@@ -83,7 +81,6 @@ int create_vk_instance(VkContext *context) {
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 	
-    // required
     VkInstanceCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pApplicationInfo = &app_info;
@@ -97,24 +94,17 @@ int create_vk_instance(VkContext *context) {
 	}else{
 		create_info.enabledLayerCount = 0;
 	}
-    VkInstance instance;
-    if(vkCreateInstance(&create_info, NULL, &instance) != VK_SUCCESS) {
-		log("Vulkan instance creation failed.");
+    if(vkCreateInstance(&create_info, NULL, &context->instance) != VK_SUCCESS) {
         return FAILURE;
     }
-	context->instance = instance;
-  	log("Vulkan instance creation succesful!");
-	 return SUCCESS;
+	return SUCCESS;
 }
 
 int create_surface(VkContext *context){
-	VkSurfaceKHR surface;
-	if(glfwCreateWindowSurface(context->instance, context-> window, NULL, &surface) != VK_SUCCESS){
-		log("Surface creation failed.");
+	assert(context != NULL);
+	if(glfwCreateWindowSurface(context->instance, context->window, NULL, &context->surface) != VK_SUCCESS){
 		return FAILURE;
 	}
-	context->surface = surface;
-	log("Surface creation succesful!");
 	return SUCCESS;
 }
 
@@ -254,37 +244,31 @@ int pick_physical_device(VkContext *context){
 	uint32_t physical_device_count = 0;
 	vkEnumeratePhysicalDevices(context->instance, &physical_device_count, NULL);
 	if(physical_device_count == 0){
-		log("No physical devices available.");
 		return FAILURE;
 	}
 	VkPhysicalDevice* physical_devices = malloc(sizeof(VkPhysicalDevice) * physical_device_count);
 	vkEnumeratePhysicalDevices(context->instance, &physical_device_count, physical_devices);
+	
 	for(uint32_t i = 0; i < physical_device_count; i++){
 		uint32_t graphics_queue_index = find_graphics_queue(physical_devices[i]);
 		uint32_t present_queue_index = find_present_queue(context->surface, physical_devices[i]);
 		if(graphics_queue_index == UINT32_MAX || present_queue_index == UINT32_MAX){	
-			log("Queue indices failed.");
 			return FAILURE;
 		}
 		if(!supports_extensions(physical_devices[i])){
-			log("Extension support failed.");
 			return FAILURE;
 		}
 		if(select_swapchain_surface_format(physical_devices[i], context->surface).format == VK_FORMAT_UNDEFINED){
-			log("Swapchain surface format not found.");
 			return FAILURE;
 		}
 		context->physical_device = physical_devices[i];
 		context->graphics_queue_index = graphics_queue_index;
 		context->present_queue_index = present_queue_index;
 		free(physical_devices);
-		log("Physical device picked succesful!.");
 		return SUCCESS;
 		}
 	free(physical_devices);
-	log("No suitable physical device found.");
 	return FAILURE;
-
 }
 
 int create_logical_device(VkContext *context){
@@ -312,7 +296,6 @@ int create_logical_device(VkContext *context){
 	create_info.pQueueCreateInfos = queue_create_infos;
 	create_info.queueCreateInfoCount = actual_queue_count;
 	create_info.pEnabledFeatures = &device_features;
-	// in modern vulkan, it is unnecesary, but usefull for old vulkan
 	create_info.enabledExtensionCount = extension_count;
 	create_info.ppEnabledExtensionNames = extensions;
 	if(enable_validation_layers){
@@ -321,37 +304,27 @@ int create_logical_device(VkContext *context){
 	}else{
 		create_info.enabledLayerCount = 0;
 	}
-	VkDevice logical_device;
-	if(vkCreateDevice(context->physical_device, &create_info, NULL, &logical_device) != VK_SUCCESS){
-		log("Logical device creation failed.");
+	if(vkCreateDevice(context->physical_device, &create_info, NULL, &context->logical_device) != VK_SUCCESS){
 		return FAILURE;
 	}
-	context->logical_device = logical_device;
-	log("Logical device creation succesful!");
 	return SUCCESS;
 }
 
 int set_graphics_queue(VkContext *context){
-	VkQueue graphics_queue;
-	vkGetDeviceQueue(context->logical_device, context-> graphics_queue_index, 0, &graphics_queue);
-	if(graphics_queue == NULL){
-		log("Setting the graphics queue failed.");
+	assert(context != NULL);
+	vkGetDeviceQueue(context->logical_device, context->graphics_queue_index, 0, &context->graphics_queue);
+	if(context->graphics_queue == NULL){
 		return FAILURE;
 	}
-	context->graphics_queue = graphics_queue;
-	log("Set the graphics queue succesfully!");
 	return SUCCESS;
 }
 
 int set_present_queue(VkContext *context){
-	VkQueue present_queue;
-	vkGetDeviceQueue(context->logical_device, context->present_queue_index, 0, &present_queue);
-	if(present_queue == NULL){
-		log("Setting the present queue failed.");
+	assert(context != NULL);
+	vkGetDeviceQueue(context->logical_device, context->present_queue_index, 0, &context->present_queue);
+	if(context->present_queue == NULL){
 		return FAILURE;
 	}
-	context->present_queue = present_queue;
-	log("Set the present queue succesfully!");
 	return SUCCESS;
 }
 
@@ -393,35 +366,27 @@ int create_swapchain(VkContext *context){
 	create_info.presentMode = present_mode;
 	create_info.clipped = VK_TRUE;
 	create_info.oldSwapchain = VK_NULL_HANDLE;
-	VkSwapchainKHR swapchain;
-	if(vkCreateSwapchainKHR(context->logical_device, &create_info, NULL, &swapchain) != VK_SUCCESS){
+	if(vkCreateSwapchainKHR(context->logical_device, &create_info, NULL, &context->swapchain) != VK_SUCCESS){
 		return FAILURE;
 	}
-	context->swapchain = swapchain;
-	log("Created the swapchain succesfully!");
 	return SUCCESS;
 }
 
 void cleanup_vk_context(VkContext *context){
 	if(context->swapchain != NULL){
 		vkDestroySwapchainKHR(context->logical_device, context->swapchain, NULL);
-		log("Destroyed the swapchain.");
 	}
 	if(context->logical_device != NULL){			
 		vkDestroyDevice(context->logical_device, NULL);
-		log("Destroyed the logical device.");
 	}
 	if(context->surface != NULL){	
 		vkDestroySurfaceKHR(context->instance, context->surface, NULL);
-		log("Destroyed the surface.");
 	}
 	if(context->instance != NULL){
 		vkDestroyInstance(context->instance, NULL);
-		log("Destroyed the vulkan instance.");
 	}
 	if(context->window != NULL){
     	glfwDestroyWindow(context->window);
-		log("Destroyed the glfw window.");
 	}
 }
 
