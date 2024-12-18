@@ -33,6 +33,11 @@ typedef struct {
 	VkQueue graphics_queue;
 	VkQueue present_queue;
 	VkSwapchainKHR swapchain;
+	VkImage *swapchain_images;
+	uint32_t image_count;
+	VkFormat swapchain_image_format;
+	VkExtent2D swapchain_extent;
+	VkImageView *swapchain_image_views;
 } VkContext;
 
 int create_window(VkContext* context) {
@@ -333,8 +338,8 @@ int create_swapchain(VkContext *context){
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &capabilities);
 	VkSurfaceFormatKHR format = select_swapchain_surface_format(context->physical_device, context->surface);
 	VkPresentModeKHR present_mode = select_swapchain_present_mode(context->physical_device, context->surface);
-	VkExtent2D extent = select_swapchain_extent(context->physical_device, context->surface, context->window);
 	uint32_t image_count = capabilities.minImageCount + 1;
+	VkExtent2D extent = select_swapchain_extent(context->physical_device, context->surface, context->window);
 	if(image_count > capabilities.maxImageCount && capabilities.maxImageCount > 0){
 		image_count = capabilities.maxImageCount;
 	}
@@ -372,7 +377,60 @@ int create_swapchain(VkContext *context){
 	return SUCCESS;
 }
 
+int create_swapchain_images(VkContext *context){
+	assert(context != NULL);
+	uint32_t image_count = 0;
+	vkGetSwapchainImagesKHR(context->logical_device, context->swapchain, &image_count, NULL);
+	context->swapchain_images = malloc(sizeof(VkImage) * image_count);
+	vkGetSwapchainImagesKHR(context->logical_device, context->swapchain, &image_count, context->swapchain_images);
+	context->image_count = image_count;
+	return SUCCESS;	
+}
+
+int set_swapchain_format(VkContext *context){	
+	context->swapchain_image_format = select_swapchain_surface_format(context->physical_device, context->surface).format;
+	return SUCCESS;
+}
+
+int set_swapchain_extent(VkContext *context){
+	context->swapchain_extent = select_swapchain_extent(context->physical_device, context->surface, context->window);
+	return SUCCESS;
+}
+
+int create_swapchain_image_views(VkContext *context){
+	context->swapchain_image_views = malloc(sizeof(VkImageView) * context->image_count);
+	for(uint32_t i = 0; i < context->image_count; i++){
+		VkImageViewCreateInfo create_info = {};
+		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		create_info.image = context->swapchain_images[i];
+		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		create_info.format = context->swapchain_image_format;
+		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		create_info.subresourceRange.baseMipLevel = 0;
+		create_info.subresourceRange.levelCount = 1;
+		create_info.subresourceRange.baseArrayLayer = 0;
+		create_info.subresourceRange.layerCount = 1;
+		if(vkCreateImageView(context->logical_device, &create_info, NULL, &context->swapchain_image_views[i]) != VK_SUCCESS){
+			return FAILURE;
+		}
+	}
+	return SUCCESS;	
+}
+
 void cleanup_vk_context(VkContext *context){
+	if(context->swapchain_image_views != NULL){
+		for(uint32_t i = 0; i < context->image_count; i++){
+			vkDestroyImageView(context->logical_device, context->swapchain_image_views[i], NULL);
+		}
+		free(context->swapchain_image_views);
+	}	
+	if(context->swapchain_images != NULL){
+		free(context->swapchain_images);
+	}
 	if(context->swapchain != NULL){
 		vkDestroySwapchainKHR(context->logical_device, context->swapchain, NULL);
 	}
@@ -414,6 +472,18 @@ bool initialise_vulkan_context(VkContext *context){
 		return false;
 	}
 	if(create_swapchain(context) == FAILURE){
+		return false;
+	}
+	if(create_swapchain_images(context) == FAILURE){
+		return false;
+	}
+	if(set_swapchain_format(context) == FAILURE){
+		return false;
+	}
+	if(set_swapchain_extent(context) == FAILURE){
+		return false;
+	}
+	if(create_swapchain_image_views(context) == FAILURE){
 		return false;
 	}
 	return true;
