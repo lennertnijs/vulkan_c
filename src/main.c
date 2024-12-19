@@ -42,7 +42,7 @@ typedef struct {
 
 int create_window(VkContext* context) {
 	assert(context != NULL);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // dont use openGL
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     context->window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
 	if(context->window == NULL){
@@ -421,6 +421,56 @@ int create_swapchain_image_views(VkContext *context){
 	return SUCCESS;	
 }
 
+char* read_file(char* file_name, size_t *length){
+	assert(file_name != NULL);
+	FILE *file = fopen(file_name, "rb");
+	if(!file){
+		return NULL;
+	}	
+	fseek(file, 0, SEEK_END);
+	long file_size = ftell(file);
+	if(file_size < 0){
+		fclose(file);
+		return NULL;
+	}
+	rewind(file);
+	
+	char* buffer = (char*)malloc(file_size);
+	if(!buffer){
+		fclose(file);
+		return NULL;
+	}
+	size_t read_size = fread(buffer, 1, file_size, file);
+	if(read_size != file_size){
+		free(buffer);
+		fclose(file);
+		return NULL;
+	}
+	fclose(file);
+	*length	= file_size;
+	return buffer;
+}
+
+int create_shader_module(VkContext *context, char* code, size_t length){
+	VkShaderModuleCreateInfo create_info = {};
+	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	create_info.codeSize = length;
+	create_info.pCode = code; // align the char* to uint32_t (so, 4x the space from 1 byte to 4 bytes)
+	VkShaderModule shader_module;
+	if(vkCreateShaderModule(context->logical_device, &create_info, NULL, &shader_module) != VK_SUCCESS){
+		return FAILURE;
+	}
+	return SUCCESS;
+}
+
+int create_graphics_pipeline(VkContext *context){
+	size_t vert_shader_length = 0;
+	char *vert_shader_code = read_file("vert.spv", &vert_shader_length);
+	size_t frag_shader_length = 0;
+	char *frag_shader_code = read_file("frag.spv", &frag_shader_length);
+	return FAILURE;	
+}
+
 void cleanup_vk_context(VkContext *context){
 	if(context->swapchain_image_views != NULL){
 		for(uint32_t i = 0; i < context->image_count; i++){
@@ -485,6 +535,9 @@ bool initialise_vulkan_context(VkContext *context){
 	}
 	if(create_swapchain_image_views(context) == FAILURE){
 		return false;
+	}
+	if(create_graphics_pipeline(context) == FAILURE){
+		return true;
 	}
 	return true;
 }
