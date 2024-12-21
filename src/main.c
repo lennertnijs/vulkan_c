@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <assert.h>
+#include "math.c"
 
 #define SUCCESS 1
 #define FAILURE 0
@@ -19,8 +20,15 @@
 
 const int validation_layer_count = 1;
 const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
+const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 const int extension_count = 1;
-const char *extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+typedef struct {
+	uint32_t image_count;
+	VkSurfaceFormatKHR image_format;
+	VkExtent2D image_extent;
+	VkPresentModeKHR present_mode;
+	VkSurfaceTransformFlagBitsKHR transform;
+} SwapchainInfo;
 
 typedef struct {
 	GLFWwindow* window;
@@ -33,28 +41,24 @@ typedef struct {
 	VkQueue graphics_queue;
 	VkQueue present_queue;
 	VkSwapchainKHR swapchain;
-	VkImage *swapchain_images;
-	uint32_t image_count;
-	VkFormat swapchain_image_format;
-	VkExtent2D swapchain_extent;
-	VkImageView *swapchain_image_views;
+	SwapchainInfo swapchain_info;
+	VkImage *images;
+	VkImageView *image_views;
 } VkContext;
 
-int create_window(VkContext* context) {
+void create_window(VkContext* context) {
 	assert(context != NULL);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // dont use openGL
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     context->window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
-	if(context->window == NULL){
-		return FAILURE;
-	}
-	return SUCCESS;
+	assert(context->window != NULL);
 }
 
 bool supports_validation_layer(){
     uint32_t supported_layer_count = 0;
     vkEnumerateInstanceLayerProperties(&supported_layer_count, NULL);
     VkLayerProperties* supported_layers_list = malloc(sizeof(VkLayerProperties) * supported_layer_count);
+	assert(supported_layers_list != NULL);
     vkEnumerateInstanceLayerProperties(&supported_layer_count, supported_layers_list);
     
     for(int i = 0; i < validation_layer_count; i++){
@@ -72,12 +76,11 @@ bool supports_validation_layer(){
     return true;
 }
 
-int create_vk_instance(VkContext *context) {
+void create_vk_instance(VkContext *context) {
 	assert(context != NULL);
 	if(enable_validation_layers && !supports_validation_layer()){
-		return FAILURE;
+		return;
 	}
-    // optional, but helps with optimisation
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "Vulkan";
@@ -99,18 +102,14 @@ int create_vk_instance(VkContext *context) {
 	}else{
 		create_info.enabledLayerCount = 0;
 	}
-    if(vkCreateInstance(&create_info, NULL, &context->instance) != VK_SUCCESS) {
-        return FAILURE;
-    }
-	return SUCCESS;
+    VkResult result = vkCreateInstance(&create_info, NULL, &context->instance);
+	assert(result == VK_SUCCESS);
 }
 
-int create_surface(VkContext *context){
+void create_surface(VkContext *context){
 	assert(context != NULL);
-	if(glfwCreateWindowSurface(context->instance, context->window, NULL, &context->surface) != VK_SUCCESS){
-		return FAILURE;
-	}
-	return SUCCESS;
+	VkResult result = glfwCreateWindowSurface(context->instance, context->window, NULL, &context->surface);
+	assert(result == VK_SUCCESS);
 }
 
 
@@ -149,139 +148,71 @@ uint32_t find_present_queue(VkSurfaceKHR surface, VkPhysicalDevice physical_devi
 }
 
 bool supports_extensions(VkPhysicalDevice physical_device){
-    // the presence of the presentation queue implicitly means it is supported!
+	assert(physical_device != NULL);
     uint32_t supported_extension_count = 0;
 	vkEnumerateDeviceExtensionProperties(physical_device, NULL, &supported_extension_count, NULL);
 	if(supported_extension_count == 0){
 		return false;
 	}
-    VkExtensionProperties *supported_extension_properties_list = malloc(sizeof(VkExtensionProperties) * supported_extension_count);
-    vkEnumerateDeviceExtensionProperties(physical_device, NULL, &supported_extension_count, supported_extension_properties_list);
+    VkExtensionProperties *supported_extensions = malloc(sizeof(VkExtensionProperties) * supported_extension_count);
+    vkEnumerateDeviceExtensionProperties(physical_device, NULL, &supported_extension_count, supported_extensions);
 
     for(int i = 0; i < extension_count; i++){
         bool extension_supported = false;
         for(int j = 0; j < supported_extension_count; j++){
-            if(strcmp(extensions[i], supported_extension_properties_list[j].extensionName) == 0){
+            if(strcmp(extensions[i], supported_extensions[j].extensionName) == 0){
                 extension_supported = true;
                 break;
             }
         }
         if(!extension_supported){
-            free(supported_extension_properties_list);
+            free(supported_extensions);
             return false;
         }
     }
-    free(supported_extension_properties_list);
+    free(supported_extensions);
     return true;
 }
 
-// there was a third thing here for the swapchain requirements. no clue what, though. see around p75
-
-VkSurfaceFormatKHR select_swapchain_surface_format(VkPhysicalDevice physical_device, VkSurfaceKHR surface){
-	VkSurfaceFormatKHR selected_format;
-
+bool supports_surface_format(VkPhysicalDevice physical_device, VkSurfaceKHR surface){
 	uint32_t format_count = 0;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, NULL);
-	if(format_count == 0){
-		log("No formats are supported.");
-		selected_format.format = VK_FORMAT_UNDEFINED;
-		return selected_format;
-	}
-	VkSurfaceFormatKHR *formats = malloc(sizeof(VkSurfaceFormatKHR) * format_count);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats);
-
-	selected_format = formats[0];
-	for(uint32_t i = 0; i < format_count; i++){
-		if(formats[i].format == VK_FORMAT_B8G8R8A8_SRGB && formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR){
-			selected_format = formats[i];
-			break;
-		}
-	}
-	free(formats);
-	return selected_format;
+	return format_count > 0; 
 }
 
-VkPresentModeKHR select_swapchain_present_mode(VkPhysicalDevice physical_device, VkSurfaceKHR surface){
-	VkPresentModeKHR selected_present_mode;
-
-	uint32_t present_mode_count = 0;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, NULL);
-	if(present_mode_count == 0){
-		log("No present modes are supported.");
-		return VK_PRESENT_MODE_FIFO_KHR;
-	}
-	VkPresentModeKHR *present_modes = malloc(sizeof(VkPresentModeKHR) * present_mode_count);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes);
-	
-	for(uint32_t i = 0; i < present_mode_count; i++){
-		if(present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR){
-			selected_present_mode = present_modes[i];
-			break;
-		}
-	}
-	free(present_modes);
-	return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-
-VkExtent2D select_swapchain_extent(VkPhysicalDevice physical_device, VkSurfaceKHR surface, GLFWwindow *window){
-	VkSurfaceCapabilitiesKHR capabilities = {};
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &capabilities);
-	
-	if(capabilities.currentExtent.width != UINT32_MAX){
-		return capabilities.currentExtent;
-	}else{
-		uint32_t width, height;
-		glfwGetFramebufferSize(window, &width, &height);
-		
-		width = width < capabilities.minImageExtent.width ? capabilities.minImageExtent.width : width;
-		width = width > capabilities.maxImageExtent.width ? capabilities.maxImageExtent.width : width;
-		height = height < capabilities.minImageExtent.height ? capabilities.minImageExtent.height : height;
-		height = height > capabilities.maxImageExtent.height ? capabilities.maxImageExtent.height : height;
-		VkExtent2D extent = {};
-		extent.width = width;
-		extent.height = height;
-		return extent;	
-	}
-}
-
-int pick_physical_device(VkContext *context){
+void pick_physical_device(VkContext *context){
+	assert(context != NULL);
 	uint32_t physical_device_count = 0;
 	vkEnumeratePhysicalDevices(context->instance, &physical_device_count, NULL);
-	if(physical_device_count == 0){
-		return FAILURE;
-	}
+	assert(physical_device_count);
 	VkPhysicalDevice* physical_devices = malloc(sizeof(VkPhysicalDevice) * physical_device_count);
 	vkEnumeratePhysicalDevices(context->instance, &physical_device_count, physical_devices);
 	
 	for(uint32_t i = 0; i < physical_device_count; i++){
 		uint32_t graphics_queue_index = find_graphics_queue(physical_devices[i]);
 		uint32_t present_queue_index = find_present_queue(context->surface, physical_devices[i]);
-		if(graphics_queue_index == UINT32_MAX || present_queue_index == UINT32_MAX){	
-			return FAILURE;
-		}
-		if(!supports_extensions(physical_devices[i])){
-			return FAILURE;
-		}
-		if(select_swapchain_surface_format(physical_devices[i], context->surface).format == VK_FORMAT_UNDEFINED){
-			return FAILURE;
+		if(graphics_queue_index == UINT32_MAX || present_queue_index == UINT32_MAX 
+			|| !supports_extensions(physical_devices[i])
+			|| !supports_surface_format(physical_devices[i], context->surface)){	
+			continue;
 		}
 		context->physical_device = physical_devices[i];
-		context->graphics_queue_index = graphics_queue_index;
-		context->present_queue_index = present_queue_index;
-		free(physical_devices);
-		return SUCCESS;
+		break;
 		}
 	free(physical_devices);
-	return FAILURE;
+	assert(context->physical_device != NULL);
 }
 
-int create_logical_device(VkContext *context){
+void create_logical_device(VkContext *context){	
+	assert(context != NULL);
+	context->graphics_queue_index = find_graphics_queue(context->physical_device);
+	context->present_queue_index = find_present_queue(context->surface, context->physical_device);
+
 	VkDeviceQueueCreateInfo queue_create_infos[2];
-	int actual_queue_count = context->graphics_queue_index != context->graphics_queue_index ? 2 : 1;
+	int queue_count = context->graphics_queue_index != context->present_queue_index ? 2 : 1;
 	VkDeviceQueueCreateInfo graphics_queue_create_info = {};
 	graphics_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	graphics_queue_create_info.queueFamilyIndex = context-> graphics_queue_index;
+	graphics_queue_create_info.queueFamilyIndex = context->graphics_queue_index;
 	graphics_queue_create_info.queueCount = 1;
 	float queue_priority = 1.0f;
 	graphics_queue_create_info.pQueuePriorities = &queue_priority;
@@ -296,10 +227,11 @@ int create_logical_device(VkContext *context){
 	}	
 	
 	VkPhysicalDeviceFeatures device_features = {};
+
 	VkDeviceCreateInfo create_info = {};
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	create_info.pQueueCreateInfos = queue_create_infos;
-	create_info.queueCreateInfoCount = actual_queue_count;
+	create_info.queueCreateInfoCount = queue_count;
 	create_info.pEnabledFeatures = &device_features;
 	create_info.enabledExtensionCount = extension_count;
 	create_info.ppEnabledExtensionNames = extensions;
@@ -309,48 +241,84 @@ int create_logical_device(VkContext *context){
 	}else{
 		create_info.enabledLayerCount = 0;
 	}
-	if(vkCreateDevice(context->physical_device, &create_info, NULL, &context->logical_device) != VK_SUCCESS){
-		return FAILURE;
-	}
-	return SUCCESS;
-}
+	VkResult result = vkCreateDevice(context->physical_device, &create_info, NULL, &context->logical_device);
+	assert(result == VK_SUCCESS);
 
-int set_graphics_queue(VkContext *context){
-	assert(context != NULL);
 	vkGetDeviceQueue(context->logical_device, context->graphics_queue_index, 0, &context->graphics_queue);
-	if(context->graphics_queue == NULL){
-		return FAILURE;
-	}
-	return SUCCESS;
-}
+	assert(context->graphics_queue != NULL);
 
-int set_present_queue(VkContext *context){
-	assert(context != NULL);
 	vkGetDeviceQueue(context->logical_device, context->present_queue_index, 0, &context->present_queue);
-	if(context->present_queue == NULL){
-		return FAILURE;
-	}
-	return SUCCESS;
+	assert(context->present_queue != NULL);
 }
 
-int create_swapchain(VkContext *context){	
+void query_swapchain_info(VkContext *context, SwapchainInfo *info){
+	assert(context != NULL);
+	assert(info != NULL);
+	
 	VkSurfaceCapabilitiesKHR capabilities = {};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &capabilities);
-	VkSurfaceFormatKHR format = select_swapchain_surface_format(context->physical_device, context->surface);
-	VkPresentModeKHR present_mode = select_swapchain_present_mode(context->physical_device, context->surface);
-	uint32_t image_count = capabilities.minImageCount + 1;
-	VkExtent2D extent = select_swapchain_extent(context->physical_device, context->surface, context->window);
-	if(image_count > capabilities.maxImageCount && capabilities.maxImageCount > 0){
-		image_count = capabilities.maxImageCount;
+
+	info->image_count = capabilities.minImageCount + 1;
+	if(capabilities.maxImageCount != 0 && info->image_count > capabilities.maxImageCount){
+		info->image_count = capabilities.maxImageCount;
+	}	
+	
+	if(capabilities.currentExtent.width != UINT32_MAX){
+		info->image_extent = capabilities.currentExtent;
+	}else{
+		uint32_t width, height;
+		glfwGetFramebufferSize(context->window, &width, &height);
+		info->image_extent = (VkExtent2D) {
+			.width = clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+			.height = clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)	
+		};	
 	}
+	
+	uint32_t format_count = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(context->physical_device, context->surface, &format_count, NULL);
+	assert(format_count > 0);
+	VkSurfaceFormatKHR *formats = malloc(sizeof(VkSurfaceFormatKHR) * format_count);
+	assert(formats != NULL);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(context->physical_device, context->surface, &format_count, formats);
+	info->image_format = formats[0];
+	for(uint32_t i = 0; i < format_count; i++){
+		if(formats[i].format == VK_FORMAT_B8G8R8A8_SRGB && formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR){
+			info->image_format = formats[i];
+			break;
+		}
+	}
+	free(formats);
+	
+	uint32_t present_mode_count = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(context->physical_device, context->surface, &present_mode_count, NULL);
+	assert(present_mode_count > 0);
+	VkPresentModeKHR *present_modes = malloc(sizeof(VkPresentModeKHR) * present_mode_count);
+	assert(present_modes != NULL);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(context->physical_device, context->surface, &present_mode_count, present_modes);
+	info->present_mode = VK_PRESENT_MODE_FIFO_KHR;
+	for(uint32_t i = 0; i < present_mode_count; i++){
+		if(present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR){
+			info->present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+			break;
+		}
+	}
+	free(present_modes);
+
+	info->transform = capabilities.currentTransform;
+}
+
+void create_swapchain(VkContext *context){
+	assert(context != NULL);
+	SwapchainInfo swapchain_info; 
+	query_swapchain_info(context, &swapchain_info);	
 	
 	VkSwapchainCreateInfoKHR create_info = {}; 
 	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	create_info.surface = context->surface;
-	create_info.minImageCount = image_count;
-	create_info.imageFormat = format.format;
-	create_info.imageColorSpace = format.colorSpace;
-	create_info.imageExtent = extent;
+	create_info.minImageCount = swapchain_info.image_count;
+	create_info.imageFormat = swapchain_info.image_format.format;
+	create_info.imageColorSpace = swapchain_info.image_format.colorSpace;
+	create_info.imageExtent = swapchain_info.image_extent;
 	create_info.imageArrayLayers  = 1;
 	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
@@ -366,45 +334,33 @@ int create_swapchain(VkContext *context){
 		create_info.queueFamilyIndexCount = 0;
 		create_info.pQueueFamilyIndices = NULL;
 	}
-	create_info.preTransform = capabilities.currentTransform;
+	create_info.preTransform = swapchain_info.transform;
 	create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	create_info.presentMode = present_mode;
+	create_info.presentMode = swapchain_info.present_mode;
 	create_info.clipped = VK_TRUE;
 	create_info.oldSwapchain = VK_NULL_HANDLE;
-	if(vkCreateSwapchainKHR(context->logical_device, &create_info, NULL, &context->swapchain) != VK_SUCCESS){
-		return FAILURE;
-	}
-	return SUCCESS;
+	VkResult result = vkCreateSwapchainKHR(context->logical_device, &create_info, NULL, &context->swapchain);
+	assert(result == VK_SUCCESS);	
+	context->swapchain_info = swapchain_info;
 }
 
-int create_swapchain_images(VkContext *context){
+void create_images(VkContext *context){
 	assert(context != NULL);
 	uint32_t image_count = 0;
 	vkGetSwapchainImagesKHR(context->logical_device, context->swapchain, &image_count, NULL);
-	context->swapchain_images = malloc(sizeof(VkImage) * image_count);
-	vkGetSwapchainImagesKHR(context->logical_device, context->swapchain, &image_count, context->swapchain_images);
-	context->image_count = image_count;
-	return SUCCESS;	
+	context->images = malloc(sizeof(VkImage) * image_count);
+	vkGetSwapchainImagesKHR(context->logical_device, context->swapchain, &image_count, context->images);	
 }
 
-int set_swapchain_format(VkContext *context){	
-	context->swapchain_image_format = select_swapchain_surface_format(context->physical_device, context->surface).format;
-	return SUCCESS;
-}
 
-int set_swapchain_extent(VkContext *context){
-	context->swapchain_extent = select_swapchain_extent(context->physical_device, context->surface, context->window);
-	return SUCCESS;
-}
-
-int create_swapchain_image_views(VkContext *context){
-	context->swapchain_image_views = malloc(sizeof(VkImageView) * context->image_count);
-	for(uint32_t i = 0; i < context->image_count; i++){
+void create_image_views(VkContext *context){
+	context->image_views = malloc(sizeof(VkImageView) * context->swapchain_info.image_count);
+	for(uint32_t i = 0; i < context->swapchain_info.image_count; i++){
 		VkImageViewCreateInfo create_info = {};
 		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		create_info.image = context->swapchain_images[i];
+		create_info.image = context->images[i];
 		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		create_info.format = context->swapchain_image_format;
+		create_info.format = context->swapchain_info.image_format.format;
 		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -414,11 +370,9 @@ int create_swapchain_image_views(VkContext *context){
 		create_info.subresourceRange.levelCount = 1;
 		create_info.subresourceRange.baseArrayLayer = 0;
 		create_info.subresourceRange.layerCount = 1;
-		if(vkCreateImageView(context->logical_device, &create_info, NULL, &context->swapchain_image_views[i]) != VK_SUCCESS){
-			return FAILURE;
-		}
+		VkResult result = vkCreateImageView(context->logical_device, &create_info, NULL, &context->image_views[i]);
+		assert(result == VK_SUCCESS);
 	}
-	return SUCCESS;	
 }
 
 char* read_file(char* file_name, size_t *length){
@@ -451,35 +405,39 @@ char* read_file(char* file_name, size_t *length){
 	return buffer;
 }
 
-int create_shader_module(VkContext *context, char* code, size_t length){
+VkShaderModule create_shader_module(VkContext *context, char* code, size_t length){
 	VkShaderModuleCreateInfo create_info = {};
 	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	create_info.codeSize = length;
-	create_info.pCode = code; // align the char* to uint32_t (so, 4x the space from 1 byte to 4 bytes)
+	create_info.pCode = (uint32_t*)code; // align the char* to uint32_t (so, 4x the space from 1 byte to 4 bytes)
 	VkShaderModule shader_module;
 	if(vkCreateShaderModule(context->logical_device, &create_info, NULL, &shader_module) != VK_SUCCESS){
-		return FAILURE;
+		return NULL;
 	}
-	return SUCCESS;
+	return shader_module;
 }
 
-int create_graphics_pipeline(VkContext *context){
+void create_graphics_pipeline(VkContext *context){
 	size_t vert_shader_length = 0;
 	char *vert_shader_code = read_file("vert.spv", &vert_shader_length);
 	size_t frag_shader_length = 0;
 	char *frag_shader_code = read_file("frag.spv", &frag_shader_length);
-	return FAILURE;	
+	//VkShaderModule vertex_shader_module = create_shader_module(context, vert_shader_code, vert_shader_length);
+	//VkShaderModule fragment_shader_module = create_shader_module(context, frag_shader_code, frag_shader_length);
+
+	//vkDestroyShaderModule(context->logical_device, fragment_shader_module, NULL);
+	//vkDestroyShaderModule(context->logical_device, vertex_shader_module, NULL);	
 }
 
 void cleanup_vk_context(VkContext *context){
-	if(context->swapchain_image_views != NULL){
-		for(uint32_t i = 0; i < context->image_count; i++){
-			vkDestroyImageView(context->logical_device, context->swapchain_image_views[i], NULL);
+	if(context->image_views != NULL){
+		for(uint32_t i = 0; i < context->swapchain_info.image_count; i++){
+			vkDestroyImageView(context->logical_device, context->image_views[i], NULL);
 		}
-		free(context->swapchain_image_views);
+		free(context->image_views);
 	}	
-	if(context->swapchain_images != NULL){
-		free(context->swapchain_images);
+	if(context->images != NULL){
+		free(context->images);
 	}
 	if(context->swapchain != NULL){
 		vkDestroySwapchainKHR(context->logical_device, context->swapchain, NULL);
@@ -499,58 +457,23 @@ void cleanup_vk_context(VkContext *context){
 }
 
 
-bool initialise_vulkan_context(VkContext *context){
-	if(create_window(context) == FAILURE){
-		return false;
-	}
-	if(create_vk_instance(context) == FAILURE){
-		return false;
-	}
-	if(create_surface(context) == FAILURE){
-		return false;
-	}
-	if(pick_physical_device(context) == FAILURE){
-		return false;
-	}
-	if(create_logical_device(context) == FAILURE){
-		return false;
-	}
-	if(set_graphics_queue(context) == FAILURE){
-		return false;
-	}
-	if(set_present_queue(context) == FAILURE){
-		return false;
-	}
-	if(create_swapchain(context) == FAILURE){
-		return false;
-	}
-	if(create_swapchain_images(context) == FAILURE){
-		return false;
-	}
-	if(set_swapchain_format(context) == FAILURE){
-		return false;
-	}
-	if(set_swapchain_extent(context) == FAILURE){
-		return false;
-	}
-	if(create_swapchain_image_views(context) == FAILURE){
-		return false;
-	}
-	if(create_graphics_pipeline(context) == FAILURE){
-		return true;
-	}
-	return true;
+void initialise_vulkan_context(VkContext *context){
+	create_window(context);
+	create_vk_instance(context);
+	create_surface(context);
+	pick_physical_device(context);
+	create_logical_device(context);
+	create_swapchain(context);
+	create_images(context);
+	create_image_views(context);
+	create_graphics_pipeline(context);
 }
 
 int main(){
 	glfwInit();
 
 	VkContext context = {};
-	if(!initialise_vulkan_context(&context)){
-		cleanup_vk_context(&context);
-		glfwTerminate();
-		return 1;
-	}
+	initialise_vulkan_context(&context);
 	while(!glfwWindowShouldClose(context.window)) {
         glfwPollEvents();
     }
