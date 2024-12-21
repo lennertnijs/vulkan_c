@@ -1,4 +1,4 @@
-#include <vulkan/vulkan.h>
+	#include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +44,7 @@ typedef struct {
 	SwapchainInfo swapchain_info;
 	VkImage *images;
 	VkImageView *image_views;
+	VkPipelineLayout pipeline_layout;
 } VkContext;
 
 void create_window(VkContext* context) {
@@ -375,33 +376,20 @@ void create_image_views(VkContext *context){
 	}
 }
 
-char* read_file(char* file_name, size_t *length){
-	assert(file_name != NULL);
+size_t fetch_file_size(char* file_name){
 	FILE *file = fopen(file_name, "rb");
-	if(!file){
-		return NULL;
-	}	
 	fseek(file, 0, SEEK_END);
-	long file_size = ftell(file);
-	if(file_size < 0){
-		fclose(file);
-		return NULL;
-	}
-	rewind(file);
-	
-	char* buffer = (char*)malloc(file_size);
-	if(!buffer){
-		fclose(file);
-		return NULL;
-	}
-	size_t read_size = fread(buffer, 1, file_size, file);
-	if(read_size != file_size){
-		free(buffer);
-		fclose(file);
-		return NULL;
-	}
+	size_t length = (size_t)ftell(file);
 	fclose(file);
-	*length	= file_size;
+	return length;
+}
+
+char* read_file(char* file_name, size_t amount){
+	assert(file_name != NULL);
+	FILE *file = fopen(file_name, "rb");	
+	char* buffer = (char*)malloc(amount);
+	size_t read_size = fread(buffer, 1, amount, file);
+	fclose(file);
 	return buffer;
 }
 
@@ -418,18 +406,119 @@ VkShaderModule create_shader_module(VkContext *context, char* code, size_t lengt
 }
 
 void create_graphics_pipeline(VkContext *context){
-	size_t vert_shader_length = 0;
-	char *vert_shader_code = read_file("vert.spv", &vert_shader_length);
-	size_t frag_shader_length = 0;
-	char *frag_shader_code = read_file("frag.spv", &frag_shader_length);
-	//VkShaderModule vertex_shader_module = create_shader_module(context, vert_shader_code, vert_shader_length);
-	//VkShaderModule fragment_shader_module = create_shader_module(context, frag_shader_code, frag_shader_length);
+	size_t vert_shader_length = fetch_file_size("src/vert.spv");
+	char *vert_shader_code = read_file("src/vert.spv", vert_shader_length);
+	size_t frag_shader_length = fetch_file_size("src/frag.spv");
+	char *frag_shader_code = read_file("src/frag.spv", frag_shader_length);
+	VkShaderModule vertex_shader_module = create_shader_module(context, vert_shader_code, vert_shader_length);
+	VkShaderModule fragment_shader_module = create_shader_module(context, frag_shader_code, frag_shader_length);
+	
+	VkPipelineShaderStageCreateInfo vertex_shader_create_info = {};
+	vertex_shader_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertex_shader_create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertex_shader_create_info.module = vertex_shader_module;
+	vertex_shader_create_info.pName = "main";
+	
+	VkPipelineShaderStageCreateInfo fragment_shader_create_info = {};
+	fragment_shader_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragment_shader_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragment_shader_create_info.module = fragment_shader_module;
+	fragment_shader_create_info.pName = "main";
+	
+	VkPipelineShaderStageCreateInfo create_infos[] = {vertex_shader_create_info, fragment_shader_create_info};	
 
-	//vkDestroyShaderModule(context->logical_device, fragment_shader_module, NULL);
-	//vkDestroyShaderModule(context->logical_device, vertex_shader_module, NULL);	
+	VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
+	vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertex_input_info.vertexBindingDescriptionCount = 0;
+	vertex_input_info.pVertexBindingDescriptions = NULL;
+	vertex_input_info.vertexAttributeDescriptionCount = 0;
+	vertex_input_info.pVertexAttributeDescriptions = NULL;
+	
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info = {};
+	input_assembly_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly_create_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	input_assembly_create_info.primitiveRestartEnable = VK_FALSE;
+	
+	VkViewport viewport = {};
+	viewport.x = 0;
+	viewport.y = 0;
+	viewport.width = (float) context->swapchain_info.image_extent.width;
+	viewport.height = (float) context->swapchain_info.image_extent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	VkOffset2D offset = {0, 0};
+	scissor.offset = offset;
+	scissor.extent = context->swapchain_info.image_extent;
+	
+	VkPipelineViewportStateCreateInfo viewport_state_create_info = {};
+	viewport_state_create_info.sType = 	VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state_create_info.viewportCount = 1;	
+	viewport_state_create_info.pViewports = &viewport;
+	viewport_state_create_info.scissorCount = 1;
+	viewport_state_create_info.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer_create_info = {};
+	rasterizer_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer_create_info.depthClampEnable = VK_FALSE;
+	rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer_create_info.lineWidth = 1.0f;
+	rasterizer_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer_create_info.depthBiasEnable = VK_FALSE;
+	rasterizer_create_info.depthBiasConstantFactor = 0.0f;
+	rasterizer_create_info.depthBiasClamp = 0.0f;
+	rasterizer_create_info.depthBiasSlopeFactor = 0.0f;
+
+	VkPipelineMultisampleStateCreateInfo multisample_create_info = {};
+	multisample_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample_create_info.sampleShadingEnable = VK_FALSE;
+	multisample_create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisample_create_info.minSampleShading = 1.0f;
+	multisample_create_info.pSampleMask = NULL;
+	multisample_create_info.alphaToCoverageEnable = VK_FALSE;
+	multisample_create_info.alphaToOneEnable = VK_FALSE;
+
+	VkPipelineColorBlendAttachmentState color_blend_attachment_create_info = {};
+	color_blend_attachment_create_info.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	color_blend_attachment_create_info.blendEnable = VK_FALSE;
+	color_blend_attachment_create_info.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	color_blend_attachment_create_info.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	color_blend_attachment_create_info.colorBlendOp = VK_BLEND_OP_ADD;
+	color_blend_attachment_create_info.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	color_blend_attachment_create_info.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	color_blend_attachment_create_info.alphaBlendOp = VK_BLEND_OP_ADD;
+
+	VkPipelineColorBlendStateCreateInfo color_blend_create_info = {};
+	color_blend_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	color_blend_create_info.logicOpEnable = VK_FALSE;
+	color_blend_create_info.logicOp = VK_LOGIC_OP_COPY;
+	color_blend_create_info.attachmentCount = 1;
+	color_blend_create_info.pAttachments = &color_blend_attachment_create_info;
+	color_blend_create_info.blendConstants[0] = 0.0f;
+	color_blend_create_info.blendConstants[1] = 0.0f;
+	color_blend_create_info.blendConstants[2] = 0.0f;
+	color_blend_create_info.blendConstants[3] = 0.0f;
+
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
+	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_create_info.setLayoutCount = 0;
+	pipeline_layout_create_info.pSetLayouts = NULL;
+	pipeline_layout_create_info.pushConstantRangeCount = 0;
+	pipeline_layout_create_info.pPushConstantRanges = NULL;
+	VkResult result = vkCreatePipelineLayout(context->logical_device, &pipeline_layout_create_info, NULL, &context->pipeline_layout);
+	assert(result == VK_SUCCESS);
+
+	vkDestroyShaderModule(context->logical_device, fragment_shader_module, NULL);
+	vkDestroyShaderModule(context->logical_device, vertex_shader_module, NULL);	
 }
 
 void cleanup_vk_context(VkContext *context){
+	if(context->pipeline_layout != NULL){
+		vkDestroyPipelineLayout(context->logical_device, context->pipeline_layout, NULL);
+	}
 	if(context->image_views != NULL){
 		for(uint32_t i = 0; i < context->swapchain_info.image_count; i++){
 			vkDestroyImageView(context->logical_device, context->image_views[i], NULL);
