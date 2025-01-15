@@ -45,6 +45,14 @@ typedef struct {
 	VkImage *images;
 	VkImageView *image_views;
 	VkPipelineLayout pipeline_layout;
+	VkRenderPass render_pass;
+	VkPipeline graphics_pipeline;
+	VkFramebuffer *frame_buffers;
+	VkCommandPool command_pool;
+	VkCommandBuffer command_buffer;
+	VkSemaphore image_available_semaphore;
+	VkSemaphore render_finished_semaphore;
+	VkFence in_flight_fence;
 } VkContext;
 
 void create_window(VkContext* context) {
@@ -160,7 +168,7 @@ bool supports_extensions(VkPhysicalDevice physical_device){
 
     for(int i = 0; i < extension_count; i++){
         bool extension_supported = false;
-        for(int j = 0; j < supported_extension_count; j++){
+        for(uint32_t j = 0; j < supported_extension_count; j++){
             if(strcmp(extensions[i], supported_extensions[j].extensionName) == 0){
                 extension_supported = true;
                 break;
@@ -267,7 +275,7 @@ void query_swapchain_info(VkContext *context, SwapchainInfo *info){
 	if(capabilities.currentExtent.width != UINT32_MAX){
 		info->image_extent = capabilities.currentExtent;
 	}else{
-		uint32_t width, height;
+		int width, height;
 		glfwGetFramebufferSize(context->window, &width, &height);
 		info->image_extent = (VkExtent2D) {
 			.width = clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -405,6 +413,47 @@ VkShaderModule create_shader_module(VkContext *context, char* code, size_t lengt
 	return shader_module;
 }
 
+void create_render_pass(VkContext *context){
+	VkAttachmentDescription color_attachment = {};
+	color_attachment.format = context->swapchain_info.image_format.format;
+	color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	
+	VkAttachmentReference color_attachment_reference = {};
+	color_attachment_reference.attachment = 0; // fragment shader index location = 0
+	color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &color_attachment_reference;
+
+
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;	
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	VkRenderPassCreateInfo render_pass_create_info = {};
+	render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	render_pass_create_info.attachmentCount = 1;
+	render_pass_create_info.pAttachments = &color_attachment;
+	render_pass_create_info.subpassCount = 1;
+	render_pass_create_info.pSubpasses = &subpass;
+	render_pass_create_info.dependencyCount = 1;
+	render_pass_create_info.pDependencies = &dependency;
+	VkResult result = vkCreateRenderPass(context->logical_device, &render_pass_create_info, NULL, &context->render_pass);
+	assert(result == VK_SUCCESS);
+}
+
 void create_graphics_pipeline(VkContext *context){
 	size_t vert_shader_length = fetch_file_size("src/vert.spv");
 	char *vert_shader_code = read_file("src/vert.spv", vert_shader_length);
@@ -425,7 +474,7 @@ void create_graphics_pipeline(VkContext *context){
 	fragment_shader_create_info.module = fragment_shader_module;
 	fragment_shader_create_info.pName = "main";
 	
-	VkPipelineShaderStageCreateInfo create_infos[] = {vertex_shader_create_info, fragment_shader_create_info};	
+	VkPipelineShaderStageCreateInfo shader_stage_create_infos[] = {vertex_shader_create_info, fragment_shader_create_info};	
 
 	VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
 	vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -502,6 +551,12 @@ void create_graphics_pipeline(VkContext *context){
 	color_blend_create_info.blendConstants[2] = 0.0f;
 	color_blend_create_info.blendConstants[3] = 0.0f;
 
+	VkDynamicState states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+	VkPipelineDynamicStateCreateInfo dynamic_state_create_info = {};
+	dynamic_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state_create_info.dynamicStateCount = 2;
+	dynamic_state_create_info.pDynamicStates = &states[0];
+
 	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
 	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_create_info.setLayoutCount = 0;
@@ -511,13 +566,191 @@ void create_graphics_pipeline(VkContext *context){
 	VkResult result = vkCreatePipelineLayout(context->logical_device, &pipeline_layout_create_info, NULL, &context->pipeline_layout);
 	assert(result == VK_SUCCESS);
 
+	VkGraphicsPipelineCreateInfo graphics_pipeline_create_info = {};
+	graphics_pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	graphics_pipeline_create_info.stageCount = 2;
+	graphics_pipeline_create_info.pStages = shader_stage_create_infos;
+	graphics_pipeline_create_info.pVertexInputState = &vertex_input_info;
+	graphics_pipeline_create_info.pInputAssemblyState = &input_assembly_create_info;
+	graphics_pipeline_create_info.pViewportState = &viewport_state_create_info;
+	graphics_pipeline_create_info.pRasterizationState = &rasterizer_create_info;
+	graphics_pipeline_create_info.pMultisampleState = &multisample_create_info;
+	graphics_pipeline_create_info.pDepthStencilState = NULL;
+	graphics_pipeline_create_info.pColorBlendState = &color_blend_create_info;
+	graphics_pipeline_create_info.pDynamicState = &dynamic_state_create_info;
+	graphics_pipeline_create_info.layout = context->pipeline_layout;
+	graphics_pipeline_create_info.renderPass = context->render_pass;
+	graphics_pipeline_create_info.subpass = 0;
+	graphics_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
+	graphics_pipeline_create_info.basePipelineIndex = -1;
+
+	result = vkCreateGraphicsPipelines(context->logical_device, VK_NULL_HANDLE, 1, &graphics_pipeline_create_info, NULL, &context->graphics_pipeline);
+	assert(result == VK_SUCCESS);
+
 	vkDestroyShaderModule(context->logical_device, fragment_shader_module, NULL);
 	vkDestroyShaderModule(context->logical_device, vertex_shader_module, NULL);	
 }
 
+void create_frame_buffers(VkContext *context){
+	context->frame_buffers = malloc(sizeof(VkFramebuffer) * context->swapchain_info.image_count);
+	for(size_t i = 0; i < context->swapchain_info.image_count; i++){
+		VkImageView image_view = context->image_views[i];
+		VkFramebufferCreateInfo frame_buffer_create_info = {};
+		frame_buffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		frame_buffer_create_info.renderPass = context->render_pass;
+		frame_buffer_create_info.attachmentCount = 1;
+		frame_buffer_create_info.pAttachments = &image_view;
+		frame_buffer_create_info.width = context->swapchain_info.image_extent.width;
+		frame_buffer_create_info.height = context->swapchain_info.image_extent.height;
+		frame_buffer_create_info.layers = 1;
+		VkResult result = vkCreateFramebuffer(context->logical_device, &frame_buffer_create_info, NULL, &context->frame_buffers[i]);
+		assert(result == VK_SUCCESS);
+	}
+}
+
+void create_command_pool(VkContext *context){
+	VkCommandPoolCreateInfo command_pool_create_info = {};
+	command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	command_pool_create_info.flags =  VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	command_pool_create_info.queueFamilyIndex = context->graphics_queue_index;
+	VkResult result = vkCreateCommandPool(context->logical_device, &command_pool_create_info, NULL, &context->command_pool);
+	assert(result == VK_SUCCESS);
+}
+
+void create_command_buffer(VkContext *context){
+	VkCommandBufferAllocateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	info.commandPool = context->command_pool;
+	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	info.commandBufferCount = 1;
+	VkResult result = vkAllocateCommandBuffers(context->logical_device, &info, &context->command_buffer);
+	assert(result == VK_SUCCESS);
+}
+
+void record_command_buffer(VkContext *context, uint32_t image_index){
+	VkCommandBufferBeginInfo begin_info = {};
+	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin_info.flags = 0;
+	begin_info.pInheritanceInfo = NULL;
+	VkResult result = vkBeginCommandBuffer(context->command_buffer, &begin_info);
+	assert(result == VK_SUCCESS);
+
+	VkRenderPassBeginInfo render_pass_info = {};
+	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	render_pass_info.renderPass = context->render_pass;
+	render_pass_info.framebuffer = context->frame_buffers[image_index];
+	render_pass_info.renderArea.offset = (VkOffset2D){0, 0};
+	render_pass_info.renderArea.extent = context->swapchain_info.image_extent;
+	
+	VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+	render_pass_info.clearValueCount = 1;
+	render_pass_info.pClearValues = &clear_color;
+	
+	vkCmdBeginRenderPass(context->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindPipeline(context->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
+	
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = 800;
+	viewport.height = 600;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(context->command_buffer, 0, 1, &viewport);
+	
+	VkRect2D scissor = {};
+	scissor.offset = (VkOffset2D){0, 0};
+	scissor.extent = context->swapchain_info.image_extent;
+	vkCmdSetScissor(context->command_buffer, 0, 1, &scissor);
+
+	vkCmdDraw(context->command_buffer, 3, 1, 0, 0);
+	
+	vkCmdEndRenderPass(context->command_buffer);
+	result = vkEndCommandBuffer(context->command_buffer);
+	assert(result == VK_SUCCESS);	
+}
+
+void create_sync_objects(VkContext *context){
+	VkSemaphoreCreateInfo semaphore_info  = {};
+	semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	
+	VkFenceCreateInfo fence_info = {};
+	fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	VkResult result = vkCreateSemaphore(context->logical_device, &semaphore_info, NULL, &context->image_available_semaphore);
+	assert(result == VK_SUCCESS);
+	result = vkCreateSemaphore(context->logical_device, &semaphore_info, NULL, &context->render_finished_semaphore);
+	assert(result == VK_SUCCESS);
+	result = vkCreateFence(context->logical_device, &fence_info, NULL, &context->in_flight_fence);
+	assert(result == VK_SUCCESS);
+}
+
+void draw_frame(VkContext *context){
+	vkWaitForFences(context->logical_device, 1, &context->in_flight_fence, VK_TRUE, UINT64_MAX);
+	vkResetFences(context->logical_device, 1, &context->in_flight_fence);
+	uint32_t image_index;
+	vkAcquireNextImageKHR(context->logical_device, context->swapchain, UINT64_MAX, context->image_available_semaphore, VK_NULL_HANDLE, &image_index);	
+	vkResetCommandBuffer(context->command_buffer, 0);
+	record_command_buffer(context, image_index);
+	
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	
+	VkSemaphore wait_semaphores[] = {context->image_available_semaphore};
+	VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	submit_info.waitSemaphoreCount = 1;
+	submit_info.pWaitSemaphores = &wait_semaphores[0];
+	submit_info.pWaitDstStageMask = &wait_stages[0];
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &context->command_buffer;
+	
+	VkSemaphore signal_semaphores[] = {context->render_finished_semaphore};
+	submit_info.signalSemaphoreCount = 1;
+	submit_info.pSignalSemaphores = &signal_semaphores[0];
+	VkResult result = vkQueueSubmit(context->graphics_queue, 1, &submit_info, context->in_flight_fence);
+	assert(result == VK_SUCCESS);	
+	
+	VkPresentInfoKHR present_info = {};
+	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	present_info.waitSemaphoreCount = 1;
+	present_info.pWaitSemaphores = &signal_semaphores[0];
+	
+	VkSwapchainKHR swapchains[] = {context->swapchain};
+	present_info.swapchainCount = 1;
+	present_info.pSwapchains = &swapchains[0];	
+	present_info.pImageIndices = &image_index;
+	present_info.pResults = NULL;
+	vkQueuePresentKHR(context->present_queue, &present_info);
+}
+
 void cleanup_vk_context(VkContext *context){
+	if(context->in_flight_fence != NULL){
+		vkDestroyFence(context->logical_device, context->in_flight_fence, NULL);
+	}
+	if(context->render_finished_semaphore != NULL){
+		vkDestroySemaphore(context->logical_device, context->render_finished_semaphore, NULL);
+	}
+	if(context->image_available_semaphore != NULL){
+		vkDestroySemaphore(context->logical_device, context->image_available_semaphore, NULL);
+	}
+	if(context->command_pool != NULL){
+		vkDestroyCommandPool(context->logical_device, context->command_pool, NULL);
+	}
+	if(context->frame_buffers != NULL){
+		for(size_t i = 0; i < context->swapchain_info.image_count; i++){
+			vkDestroyFramebuffer(context->logical_device, context->frame_buffers[i], NULL);
+		}
+		free(context->frame_buffers);
+	}
+	if(context->graphics_pipeline != NULL){
+		vkDestroyPipeline(context->logical_device, context->graphics_pipeline, NULL);
+	}
 	if(context->pipeline_layout != NULL){
 		vkDestroyPipelineLayout(context->logical_device, context->pipeline_layout, NULL);
+	}
+	if(context->render_pass != NULL){
+		vkDestroyRenderPass(context->logical_device, context->render_pass, NULL);
 	}
 	if(context->image_views != NULL){
 		for(uint32_t i = 0; i < context->swapchain_info.image_count; i++){
@@ -555,7 +788,12 @@ void initialise_vulkan_context(VkContext *context){
 	create_swapchain(context);
 	create_images(context);
 	create_image_views(context);
+	create_render_pass(context);
 	create_graphics_pipeline(context);
+	create_frame_buffers(context);
+	create_command_pool(context);
+	create_command_buffer(context);
+	create_sync_objects(context);
 }
 
 int main(){
@@ -565,7 +803,9 @@ int main(){
 	initialise_vulkan_context(&context);
 	while(!glfwWindowShouldClose(context.window)) {
         glfwPollEvents();
+		draw_frame(&context);
     }
+	vkDeviceWaitIdle(context.logical_device);
 	cleanup_vk_context(&context);
 	
 	glfwTerminate();

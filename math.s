@@ -1,5 +1,59 @@
 	.file	"math.c"
 	.text
+	.globl	min
+	.type	min, @function
+min:
+.LFB0:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	movl	%edi, -4(%rbp)
+	movl	%esi, -8(%rbp)
+	movl	-4(%rbp), %eax
+	cmpl	-8(%rbp), %eax
+	jg	.L2
+	movl	-4(%rbp), %eax
+	jmp	.L3
+.L2:
+	movl	-8(%rbp), %eax
+.L3:
+	popq	%rbp
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE0:
+	.size	min, .-min
+	.globl	max
+	.type	max, @function
+max:
+.LFB1:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	movl	%edi, -4(%rbp)
+	movl	%esi, -8(%rbp)
+	movl	-4(%rbp), %eax
+	cmpl	-8(%rbp), %eax
+	jl	.L5
+	movl	-4(%rbp), %eax
+	jmp	.L6
+.L5:
+	movl	-8(%rbp), %eax
+.L6:
+	popq	%rbp
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE1:
+	.size	max, .-max
 	.section	.rodata
 .LC0:
 	.string	"src/math.c"
@@ -9,7 +63,7 @@
 	.globl	clamp
 	.type	clamp, @function
 clamp:
-.LFB0:
+.LFB2:
 	.cfi_startproc
 	endbr64
 	pushq	%rbp
@@ -23,35 +77,35 @@ clamp:
 	movl	%edx, -12(%rbp)
 	movl	-8(%rbp), %eax
 	cmpl	-12(%rbp), %eax
-	jle	.L2
+	jle	.L8
 	leaq	__PRETTY_FUNCTION__.0(%rip), %rax
 	movq	%rax, %rcx
-	movl	$4, %edx
+	movl	$18, %edx
 	leaq	.LC0(%rip), %rax
 	movq	%rax, %rsi
 	leaq	.LC1(%rip), %rax
 	movq	%rax, %rdi
 	call	__assert_fail@PLT
-.L2:
+.L8:
 	movl	-4(%rbp), %eax
 	cmpl	-8(%rbp), %eax
-	jge	.L3
+	jge	.L9
 	movl	-8(%rbp), %eax
-	jmp	.L4
-.L3:
+	jmp	.L10
+.L9:
 	movl	-4(%rbp), %eax
 	cmpl	-12(%rbp), %eax
-	jle	.L5
+	jle	.L11
 	movl	-12(%rbp), %eax
-	jmp	.L4
-.L5:
+	jmp	.L10
+.L11:
 	movl	-4(%rbp), %eax
-.L4:
+.L10:
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE0:
+.LFE2:
 	.size	clamp, .-clamp
 	.section	.rodata
 	.type	__PRETTY_FUNCTION__.0, @object
