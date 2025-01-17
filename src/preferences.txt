@@ -1,0 +1,40 @@
+// general
+-> validation layers (true/false) 
+-> list of validation layers
+
+// glfw window
+-> resizing (true/false)
+-> width (required)
+-> height (required)
+
+// vk instance:
+-> app name (optional)
+-> app version (x, y, z) (optional)
+-> engine name (optional)
+-> engine version (x, y, z) (optional)
+-> api version (x, y, z) (optional)
+
+// surface
+nothing
+
+// physical_device
+-> should support a graphics and present queue by default, plus swapchain support and a surface format
+-> types of queues needed
+-> amount of each queue needed
+
+// logical_device
+same as physical_device 
+
+// swapchain
+-> image count (optional) 
+-> image format (optional)
+-> image colorspace (optional)
+-> present mode (optional)
+
+// images
+nothing
+
+// image views
+nothing
+
+
