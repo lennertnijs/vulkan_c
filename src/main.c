@@ -12,10 +12,8 @@
 #define FAILURE 0
 
 #ifdef DEBUG
-	#define log(msg) printf("%s\n", msg)
 	const bool enable_validation_layers = true;
 #else
-	#define log(msg)
 	const bool enable_validation_layers = false;
 #endif
 
@@ -60,6 +58,8 @@ typedef struct {
 	VkCommandPool command_pool;
 	VkBuffer vertex_buffer;
 	VkDeviceMemory vertex_buffer_memory;
+	VkBuffer index_buffer;
+	VkDeviceMemory index_buffer_memory;
 	VkCommandBuffer *command_buffers;
 	VkSemaphore *image_available_semaphores;
 	VkSemaphore *render_finished_semaphores;
@@ -67,30 +67,50 @@ typedef struct {
 } VkContext;
 
 int get_vertex_count(){
-	return 3;
+	return 4;
 }
 
 Vertex* get_vertices(){
 	Vertex *vertices = malloc(sizeof(Vertex) * get_vertex_count());
-	vertices[0].position.x = 0.0f;
+	vertices[0].position.x = -0.5f;
 	vertices[0].position.y = -0.5f;
 	vertices[0].color.x = 1.0f;
-	vertices[0].color.y = 1.0f;
-	vertices[0].color.z = 1.0f;
+	vertices[0].color.y = 0.0f;
+	vertices[0].color.z = 0.0f;
 
 	vertices[1].position.x = 0.5f;
-	vertices[1].position.y = 0.5f;
+	vertices[1].position.y = -0.5f;
 	vertices[1].color.x = 0.0f;
 	vertices[1].color.y = 1.0f;
 	vertices[1].color.z = 0.0f;
 
-	vertices[2].position.x = -0.5f;
+	vertices[2].position.x = 0.5f;
 	vertices[2].position.y = 0.5f;
 	vertices[2].color.x = 0.0f;
 	vertices[2].color.y = 0.0f;
 	vertices[2].color.z = 1.0f;
 	
+	vertices[3].position.x = -0.5f;
+	vertices[3].position.y = 0.5f;
+	vertices[3].color.x = 1.0f;
+	vertices[3].color.y = 1.0f;
+	vertices[3].color.z = 1.0f;
 	return vertices;
+}
+
+int get_index_count(){
+	return 6;
+}
+
+uint16_t* get_vertex_indices(){
+	uint16_t* indices = malloc(sizeof(uint16_t) * 6);
+	indices[0] = 0;
+	indices[1] = 1;
+	indices[2] = 2;
+	indices[3] = 2;
+	indices[4] = 3;
+	indices[5] = 0;
+	return indices;	
 }
 
 VkVertexInputBindingDescription get_binding_description(){
@@ -722,7 +742,8 @@ void record_command_buffer(VkContext *context, uint32_t image_index){
 	VkBuffer vertex_buffers[] = {context->vertex_buffer};
 	VkDeviceSize offsets[] = {0};
 	vkCmdBindVertexBuffers(context->command_buffers[current_frame], 0, 1, vertex_buffers, offsets);
-		
+	vkCmdBindIndexBuffer(context->command_buffers[current_frame], context->index_buffer, 0, VK_INDEX_TYPE_UINT16);
+	
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -737,24 +758,14 @@ void record_command_buffer(VkContext *context, uint32_t image_index){
 	scissor.extent = context->swapchain_info.image_extent;
 	vkCmdSetScissor(context->command_buffers[current_frame], 0, 1, &scissor);
 
-	vkCmdDraw(context->command_buffers[current_frame], 3, 1, 0, 0);
+	vkCmdDrawIndexed(context->command_buffers[current_frame], get_index_count(), 1, 0, 0, 0); // 6 indices
 	
 	vkCmdEndRenderPass(context->command_buffers[current_frame]);
 	result = vkEndCommandBuffer(context->command_buffers[current_frame]);
 	assert(result == VK_SUCCESS);	
 }
 
-void create_vertex_buffer(VkContext* context){
-	VkBufferCreateInfo buffer_create_info = {};
-	buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	buffer_create_info.size = sizeof(Vertex) * 3;
-	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	
-	VkResult result = vkCreateBuffer(context->logical_device, &buffer_create_info, NULL, &context->vertex_buffer);
-	assert(result == VK_SUCCESS);
-}
-
+   
 uint32_t find_memory_type(VkContext* context, uint32_t type_filter, VkMemoryPropertyFlags properties){
 	VkPhysicalDeviceMemoryProperties memory_properties;
 	vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_properties);
@@ -766,24 +777,98 @@ uint32_t find_memory_type(VkContext* context, uint32_t type_filter, VkMemoryProp
 	assert(0 == 1);
 }
 
-
-void create_vertex_buffer_memory(VkContext* context){
+void create_buffer(VkContext* context, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer* buffer, VkDeviceMemory* buffer_memory){
+	VkBufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	info.size = size;
+	info.usage = usage;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	
+	VkResult result = vkCreateBuffer(context->logical_device, &info, NULL, buffer);
+	assert(result == VK_SUCCESS);
 	VkMemoryRequirements requirements;
-	vkGetBufferMemoryRequirements(context->logical_device, context->vertex_buffer, &requirements);
-
+	vkGetBufferMemoryRequirements(context->logical_device, *buffer, &requirements);
+	
 	VkMemoryAllocateInfo alloc_info = {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.allocationSize = requirements.size;
-	alloc_info.memoryTypeIndex = find_memory_type(context, requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	VkResult result = vkAllocateMemory(context->logical_device, &alloc_info, NULL, &context->vertex_buffer_memory);
+	alloc_info.allocationSize = requirements.size;	
+	alloc_info.memoryTypeIndex = find_memory_type(context, requirements.memoryTypeBits, properties);
+	result = vkAllocateMemory(context->logical_device, &alloc_info, NULL, buffer_memory);
 	assert(result == VK_SUCCESS);
-	vkBindBufferMemory(context->logical_device, context->vertex_buffer, context->vertex_buffer_memory, 0);	
+	vkBindBufferMemory(context->logical_device, *buffer, *buffer_memory, 0);
 }
 
-void copy_vertex_data_to_buffer(VkContext* context){
+
+void copy_buffer(VkContext* context, VkBuffer src, VkBuffer dst, VkDeviceSize size){
+	VkCommandBufferAllocateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	info.commandPool = context->command_pool;
+	info.commandBufferCount = 1;
+	
+	VkCommandBuffer command_buffer;
+	vkAllocateCommandBuffers(context->logical_device, &info, &command_buffer);
+
+	VkCommandBufferBeginInfo begin_info = {};
+	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(command_buffer, &begin_info);
+	
+	VkBufferCopy copy = {};
+	copy.srcOffset = 0;
+	copy.dstOffset = 0;
+	copy.size = size;
+	vkCmdCopyBuffer(command_buffer, src, dst, 1, &copy);
+	vkEndCommandBuffer(command_buffer);
+	
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &command_buffer;
+	vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+	vkQueueWaitIdle(context->graphics_queue);
+	vkFreeCommandBuffers(context->logical_device, context->command_pool, 1, &command_buffer);
+}
+
+void create_vertex_buffer(VkContext* context){
+	VkDeviceSize buffer_size = sizeof(Vertex) * get_vertex_count();
+
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+	create_buffer(context, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
+
 	void* data;
-	vkMapMemory(context->logical_device, context->vertex_buffer_memory, 0, sizeof(Vertex) * 3, 0, &data);
-	memcpy(data, get_vertices(), (size_t) sizeof(Vertex) * 3);
+	vkMapMemory(context->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, get_vertices(), (size_t) buffer_size);
+	vkUnmapMemory(context->logical_device, staging_buffer_memory);
+
+	
+	create_buffer(context, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->vertex_buffer, &context->vertex_buffer_memory);
+	copy_buffer(context, staging_buffer, context->vertex_buffer, buffer_size);
+
+	vkDestroyBuffer(context->logical_device, staging_buffer, NULL);
+	vkFreeMemory(context->logical_device, staging_buffer_memory, NULL);
+}
+
+
+void create_index_buffer(VkContext* context){
+	VkDeviceSize buffer_size = sizeof(uint16_t) * get_index_count();
+
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_buffer_memory;
+	create_buffer(context, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
+
+	void* data;
+	vkMapMemory(context->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, get_vertex_indices(), (size_t) buffer_size);
+	vkUnmapMemory(context->logical_device, staging_buffer_memory);
+
+	
+	create_buffer(context, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->index_buffer, &context->index_buffer_memory);
+	copy_buffer(context, staging_buffer, context->index_buffer, buffer_size);
+
+	vkDestroyBuffer(context->logical_device, staging_buffer, NULL);
+	vkFreeMemory(context->logical_device, staging_buffer_memory, NULL);
 }
 
 void create_sync_objects(VkContext *context){
@@ -931,6 +1016,12 @@ void cleanup_vk_context(VkContext *context){
 	if(context->vertex_buffer_memory != NULL){
 		vkFreeMemory(context->logical_device, context->vertex_buffer_memory, NULL);
 	}
+	if(context->index_buffer != NULL){
+		vkDestroyBuffer(context->logical_device, context->index_buffer, NULL);
+	}
+	if(context->index_buffer_memory != NULL){
+		vkFreeMemory(context->logical_device, context->index_buffer_memory, NULL);
+	}
 	if(context->logical_device != NULL){			
 		vkDestroyDevice(context->logical_device, NULL);
 	}
@@ -960,8 +1051,7 @@ void initialise_vulkan_context(VkContext *context){
 	create_frame_buffers(context);
 	create_command_pool(context);
 	create_vertex_buffer(context);
-	create_vertex_buffer_memory(context);
-	copy_vertex_data_to_buffer(context);
+	create_index_buffer(context);
 	create_command_buffers(context);
 	create_sync_objects(context);
 }
