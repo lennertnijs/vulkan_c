@@ -460,6 +460,44 @@ void init_swapchain(AuroraConfig *config, AuroraSession *session){
 	assert(result == VK_SUCCESS);
 }
 
+void init_images(AuroraSession *session){
+	uint32_t count = 0;
+	vkGetSwapchainImagesKHR(session->device, session->swapchain, &count, NULL);
+	if(count == 0){
+		printf("No images in the swapchain.");
+		exit(1);
+	}
+	VkImage *images = malloc(sizeof(VkImage) * count);
+	vkGetSwapchainImagesKHR(session->device, session->swapchain, &count, images);
+	session->images = images;
+}
+
+void init_image_views(AuroraSession *session){
+	int image_count = session->image_count;
+	session->image_views = malloc(sizeof(VkImageView) * image_count);
+	for(int i = 0; i < image_count; i++){
+		VkImageViewCreateInfo create_info = {};
+		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		create_info.image = session->images[i];
+		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		create_info.format = session->image_format.format;
+		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		create_info.subresourceRange.baseMipLevel = 0;
+		create_info.subresourceRange.levelCount = 1;
+		create_info.subresourceRange.baseArrayLayer = 0;
+		create_info.subresourceRange.layerCount = 1;
+		VkResult err = vkCreateImageView(session->device, &create_info, NULL, &session->image_views[i]);
+		if(err){
+			printf("Creation of the image view failed.");
+			exit(1);
+		}
+	}
+}
+
 AuroraSession *aurora_session_create(AuroraConfig *config){
 	if(config == NULL){
 		printf("Aurora config is NULL.");
@@ -472,10 +510,17 @@ AuroraSession *aurora_session_create(AuroraConfig *config){
 	init_physical_device(config, session);
 	init_logical_device(config, session);
 	init_swapchain(config, session);
+	init_images(session);
+	init_image_views(session);
 	return session;
 }
 
 void aurora_session_destroy(AuroraSession *session){
+	for(uint32_t i = 0; i < session->image_count; i++){
+		vkDestroyImageView(session->device, session->image_views[i], NULL);
+	}
+	free(session->image_views);
+	free(session->images);
 	vkDestroySwapchainKHR(session->device, session->swapchain, NULL);
 	vkDestroyDevice(session->device, NULL);
 	vkDestroySurfaceKHR(session->instance, session->surface, NULL);
