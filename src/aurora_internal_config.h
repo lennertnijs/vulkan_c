@@ -1,9 +1,9 @@
-#ifndef AURORA_INTERNAL_PREFERENCES_H
-#define AURORA_INTERNAL_PREFERENCES_H
+#ifndef AURORA_INTERNAL_CONFIG_H
+#define AURORA_INTERNAL_CONFIG_H
 
 #include <stdbool.h>
 
-struct AuroraPreferences {
+struct AuroraConfig {
 	bool enable_validation_layers;
     const char** validation_layers;
 	int validation_layer_count;	
@@ -18,6 +18,7 @@ struct AuroraPreferences {
 	const char** extensions;
 	int extension_count;
 	int graphics_queue_count;
+	int present_queue_count;
 	int compute_queue_count;
 	int transfer_queue_count;
 	bool allow_queue_sharing;	
