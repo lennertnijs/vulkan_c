@@ -30,7 +30,9 @@ AuroraConfig *aurora_config_create(){
 		.present_queue_count = 1,
         .compute_queue_count = 1,
         .transfer_queue_count = 1,
-        .allow_queue_sharing = false
+        .allow_queue_sharing = false,
+		.present_mode = MAILBOX,
+		.image_count = 2
     };
     return config;
 }
@@ -89,4 +91,34 @@ void aurora_config_enable_default_extensions(AuroraConfig *config){
 void aurora_config_set_extensions(AuroraConfig *config, const char **names, int amount){
 	config->extensions = names;
 	config->extension_count = amount;
+}
+
+
+void aurora_config_set_graphics_queue_count(AuroraConfig *config, int amount){
+	config->graphics_queue_count = amount;
+}
+
+void aurora_config_set_present_queue_count(AuroraConfig *config, int amount){
+	config->present_queue_count = amount;
+}
+
+void aurora_config_set_compute_queue_count(AuroraConfig *config, int amount){
+	config->compute_queue_count = amount;
+}
+
+void aurora_config_set_transfer_queue_count(AuroraConfig *config, int amount){
+	config->transfer_queue_count = amount;
+}
+
+void aurora_config_allow_queue_sharing(AuroraConfig *config, bool allow_sharing){
+	config->allow_queue_sharing = allow_sharing;
+}
+
+
+void aurora_config_set_present_mode(AuroraConfig *config, PresentMode present_mode){
+	config->present_mode = present_mode;
+}
+
+void aurora_config_set_image_count(AuroraConfig *config, int amount){
+	config->image_count = amount;
 }

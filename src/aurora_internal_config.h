@@ -21,6 +21,8 @@ struct AuroraConfig {
 	int present_queue_count;
 	int compute_queue_count;
 	int transfer_queue_count;
-	bool allow_queue_sharing;	
+	bool allow_queue_sharing;
+	PresentMode present_mode;
+	int image_count;		
 };
 #endif

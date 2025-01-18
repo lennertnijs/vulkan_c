@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "math.c"
 #include "aurora.h"
 #include "aurora_internal_config.h"
 
@@ -132,7 +133,7 @@ void init_vk_instance(AuroraConfig *config, AuroraSession *session) {
 }
 
 
-void init_surface(AuroraConfig *config, AuroraSession *session){
+void init_surface(AuroraSession *session){
 	VkSurfaceKHR surface;
 	VkResult result = glfwCreateWindowSurface(session->instance, session->window, NULL, &surface);
 	assert(result == VK_SUCCESS);
@@ -348,6 +349,117 @@ void init_logical_device(AuroraConfig *config, AuroraSession *session){
 	}
 }
 
+VkPresentModeKHR translate_present_mode(PresentMode present_mode){
+	switch(present_mode){
+		case IMMEDIATE: 
+			return VK_PRESENT_MODE_IMMEDIATE_KHR;
+		case MAILBOX:
+			return VK_PRESENT_MODE_MAILBOX_KHR;
+		case FIFO:
+			return VK_PRESENT_MODE_FIFO_KHR;
+		case FIFO_RELAXED:
+			return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+		default:
+			exit(1);
+	}
+}
+
+uint32_t find_queue_type(AuroraSession *session, QueueType type){
+	for(int i = 0; i < session->queue_count; i++){
+		if((session->queues[i].type & type) != 0){
+			return i;
+		}
+	}
+	exit(1);
+}
+
+void init_swapchain(AuroraConfig *config, AuroraSession *session){
+	VkSurfaceCapabilitiesKHR capabilities= {};
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(session->physical_device, session->surface, &capabilities);
+
+	if(capabilities.maxImageCount != 0 && ((uint32_t)config->image_count) > capabilities.maxImageCount){
+		session->image_count = capabilities.maxImageCount;
+	}else if(((uint32_t)config->image_count) < capabilities.minImageCount){
+		session->image_count = capabilities.minImageCount;
+	}else{
+		session->image_count = config->image_count;
+	}
+	if(capabilities.currentExtent.width != UINT32_MAX){
+		session->image_extent = capabilities.currentExtent;
+	}else{
+		int width, height;
+		glfwGetFramebufferSize(session->window, &width, &height);
+		session->image_extent = (VkExtent2D){
+			.width = clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+			.height = clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
+		};
+	}
+
+	uint32_t format_count = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(session->physical_device, session->surface, &format_count, NULL);
+	if(format_count == 0){
+		printf("No format counts supported.");
+		exit(1);
+	}
+	VkSurfaceFormatKHR *surface_formats = malloc(sizeof(VkSurfaceFormatKHR) * format_count);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(session->physical_device, session->surface, &format_count, surface_formats);
+	session->image_format = surface_formats[0];
+	for(uint32_t i = 0; i < format_count; i++){
+		if(surface_formats[i].format == VK_FORMAT_B8G8R8A8_SRGB && surface_formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR){
+			session->image_format = surface_formats[i];
+			break;
+		}
+	}
+	free(surface_formats);
+	
+	uint32_t present_mode_count = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(session->physical_device, session->surface, &present_mode_count, NULL);
+	if(present_mode_count == 0){
+		printf("No Support modes supported.");
+		exit(1);
+	}
+	VkPresentModeKHR *present_modes = malloc(sizeof(VkPresentModeKHR) * present_mode_count);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(session->physical_device, session->surface, &present_mode_count, present_modes);
+	VkPresentModeKHR required_mode = translate_present_mode(config->present_mode);
+	for(uint32_t i = 0; i < present_mode_count; i++){
+		if(present_modes[i] == required_mode){
+			session->present_mode = required_mode;
+		}
+	}
+	
+	session->transform = capabilities.currentTransform;
+	
+	VkSwapchainCreateInfoKHR create_info = {}; 
+	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	create_info.surface = session->surface;
+	create_info.minImageCount = session->image_count;
+	create_info.imageFormat = session->image_format.format;
+	create_info.imageColorSpace = session->image_format.colorSpace;
+	create_info.imageExtent = session->image_extent;
+	create_info.imageArrayLayers  = 1;
+	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	uint32_t indices[2];
+	indices[0] = find_queue_type(session, GRAPHICS);
+	indices[1] = find_queue_type(session, PRESENT); 
+	if(indices[0] != indices[1]){
+		create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		create_info.queueFamilyIndexCount = 2;
+		create_info.pQueueFamilyIndices = indices;
+	}else{
+		create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		create_info.queueFamilyIndexCount = 0;
+		create_info.pQueueFamilyIndices = NULL;
+	}
+	create_info.preTransform = session->transform;
+	create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	create_info.presentMode = session->present_mode;
+	create_info.clipped = VK_TRUE;
+	create_info.oldSwapchain = VK_NULL_HANDLE;
+	VkResult result = vkCreateSwapchainKHR(session->device, &create_info, NULL, &session->swapchain);
+	assert(result == VK_SUCCESS);
+}
+
 AuroraSession *aurora_session_create(AuroraConfig *config){
 	if(config == NULL){
 		printf("Aurora config is NULL.");
@@ -356,13 +468,15 @@ AuroraSession *aurora_session_create(AuroraConfig *config){
 	glfwInit();
 	init_glfw_window(config, session);
 	init_vk_instance(config, session);
-	init_surface(config, session);
+	init_surface(session);
 	init_physical_device(config, session);
 	init_logical_device(config, session);
+	init_swapchain(config, session);
 	return session;
 }
 
 void aurora_session_destroy(AuroraSession *session){
+	vkDestroySwapchainKHR(session->device, session->swapchain, NULL);
 	vkDestroyDevice(session->device, NULL);
 	vkDestroySurfaceKHR(session->instance, session->surface, NULL);
 	vkDestroyInstance(session->instance, NULL);
