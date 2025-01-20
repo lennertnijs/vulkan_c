@@ -37,4 +37,11 @@ nothing
 // image views
 nothing
 
+fread
+fopen
+printf
+fprintf
+
+malloc, free, realloc, memcpy, memset
+
 

@@ -80,6 +80,10 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 	mouse_clicked(session, x, y);
 }
 
+
+void mouse_clicked(AuroraSession *session, double x, double y){
+	
+}
 void init_glfw_window(AuroraConfig *config, AuroraSession *session){
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	if(config->allow_resize){

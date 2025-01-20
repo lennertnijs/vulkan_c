@@ -27,7 +27,7 @@ AuroraConfig *aurora_config_create(){
 		.extensions = NULL,
 		.extension_count = 0,
         .allow_queue_sharing = false,
-		.present_mode = MAILBOX,
+		.present_mode = FIFO,
 		.image_count = 2,
 		.vertices = NULL,
 		.vertex_count = 0,

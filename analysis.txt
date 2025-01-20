@@ -3,53 +3,55 @@ Flat profile:
 Each sample counts as 0.01 seconds.
   %   cumulative   self              self     total           
  time   seconds   seconds    calls  ms/call  ms/call  name    
-100.00      0.02     0.02     5336     0.00     0.00  draw_frame
-  0.00      0.02     0.00     5337     0.00     0.00  get_index_count
-  0.00      0.02     0.00     5336     0.00     0.00  record_command_buffer
-  0.00      0.02     0.00       44     0.00     0.00  init_frame_buffers
-  0.00      0.02     0.00       44     0.00     0.00  init_image_views
-  0.00      0.02     0.00       44     0.00     0.00  init_images
-  0.00      0.02     0.00       44     0.00     0.00  init_swapchain
-  0.00      0.02     0.00       44     0.00     0.00  translate_present_mode
-  0.00      0.02     0.00       43     0.00     0.00  recreate_swapchain
-  0.00      0.02     0.00        4     0.00     0.00  create_buffer
-  0.00      0.02     0.00        4     0.00     0.00  find_memory_type
-  0.00      0.02     0.00        2     0.00     0.00  copy_buffer
-  0.00      0.02     0.00        2     0.00     0.00  create_shader_module
-  0.00      0.02     0.00        2     0.00     0.00  fetch_file_size
-  0.00      0.02     0.00        2     0.00     0.00  get_vertex_count
-  0.00      0.02     0.00        2     0.00     0.00  read_file
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_allow_queue_sharing
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_create
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_destroy
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_enable_default_extensions
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_enable_default_validation_layers
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_set_window_allow_resize
-  0.00      0.02     0.00        1     0.00     0.00  aurora_config_set_window_size
-  0.00      0.02     0.00        1     0.00     0.00  aurora_session_create
-  0.00      0.02     0.00        1     0.00     0.00  aurora_session_destroy
-  0.00      0.02     0.00        1     0.00    20.00  aurora_session_start
-  0.00      0.02     0.00        1     0.00     0.00  get_attribute_descriptions
-  0.00      0.02     0.00        1     0.00     0.00  get_binding_description
-  0.00      0.02     0.00        1     0.00     0.00  get_vertex_indices
-  0.00      0.02     0.00        1     0.00     0.00  get_vertices
-  0.00      0.02     0.00        1     0.00     0.00  has_graphics_queue
-  0.00      0.02     0.00        1     0.00     0.00  has_present_queue
-  0.00      0.02     0.00        1     0.00     0.00  init_command_buffers
-  0.00      0.02     0.00        1     0.00     0.00  init_command_pool
-  0.00      0.02     0.00        1     0.00     0.00  init_glfw_window
-  0.00      0.02     0.00        1     0.00     0.00  init_graphics_pipeline
-  0.00      0.02     0.00        1     0.00     0.00  init_index_buffer
-  0.00      0.02     0.00        1     0.00     0.00  init_logical_device
-  0.00      0.02     0.00        1     0.00     0.00  init_physical_device
-  0.00      0.02     0.00        1     0.00     0.00  init_render_pass
-  0.00      0.02     0.00        1     0.00     0.00  init_surface
-  0.00      0.02     0.00        1     0.00     0.00  init_sync_objects
-  0.00      0.02     0.00        1     0.00     0.00  init_vertex_buffer
-  0.00      0.02     0.00        1     0.00     0.00  init_vk_instance
-  0.00      0.02     0.00        1     0.00     0.00  supports_extensions
-  0.00      0.02     0.00        1     0.00     0.00  supports_requested_validation_layers
-  0.00      0.02     0.00        1     0.00     0.00  supports_surface_format
+ 60.00      0.03     0.03     7547     0.00     0.00  record_command_buffer
+ 40.00      0.05     0.02     7547     0.00     0.01  draw_frame
+  0.00      0.05     0.00        8     0.00     0.00  create_buffer
+  0.00      0.05     0.00        8     0.00     0.00  find_memory_type
+  0.00      0.05     0.00        4     0.00     0.00  copy_buffer
+  0.00      0.05     0.00        2     0.00     0.00  create_shader_module
+  0.00      0.05     0.00        2     0.00     0.00  fetch_file_size
+  0.00      0.05     0.00        2     0.00     0.00  init_index_buffer
+  0.00      0.05     0.00        2     0.00     0.00  init_vertex_buffer
+  0.00      0.05     0.00        2     0.00     0.00  read_file
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_allow_queue_sharing
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_create
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_destroy
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_enable_default_extensions
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_enable_default_validation_layers
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_set_vertices
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_set_window_allow_resize
+  0.00      0.05     0.00        1     0.00     0.00  aurora_config_set_window_size
+  0.00      0.05     0.00        1     0.00     0.00  aurora_session_add_vertices
+  0.00      0.05     0.00        1     0.00     0.00  aurora_session_create
+  0.00      0.05     0.00        1     0.00     0.00  aurora_session_destroy
+  0.00      0.05     0.00        1     0.00    50.00  aurora_session_start
+  0.00      0.05     0.00        1     0.00     0.00  get_attribute_descriptions
+  0.00      0.05     0.00        1     0.00     0.00  get_binding_description
+  0.00      0.05     0.00        1     0.00     0.00  get_indices
+  0.00      0.05     0.00        1     0.00     0.00  get_vertex_count
+  0.00      0.05     0.00        1     0.00     0.00  get_vertices
+  0.00      0.05     0.00        1     0.00     0.00  has_graphics_queue
+  0.00      0.05     0.00        1     0.00     0.00  has_present_queue
+  0.00      0.05     0.00        1     0.00     0.00  init_command_buffers
+  0.00      0.05     0.00        1     0.00     0.00  init_command_pool
+  0.00      0.05     0.00        1     0.00     0.00  init_frame_buffers
+  0.00      0.05     0.00        1     0.00     0.00  init_glfw_window
+  0.00      0.05     0.00        1     0.00     0.00  init_graphics_pipeline
+  0.00      0.05     0.00        1     0.00     0.00  init_image_views
+  0.00      0.05     0.00        1     0.00     0.00  init_images
+  0.00      0.05     0.00        1     0.00     0.00  init_logical_device
+  0.00      0.05     0.00        1     0.00     0.00  init_physical_device
+  0.00      0.05     0.00        1     0.00     0.00  init_render_pass
+  0.00      0.05     0.00        1     0.00     0.00  init_surface
+  0.00      0.05     0.00        1     0.00     0.00  init_swapchain
+  0.00      0.05     0.00        1     0.00     0.00  init_sync_objects
+  0.00      0.05     0.00        1     0.00     0.00  init_vertices
+  0.00      0.05     0.00        1     0.00     0.00  init_vk_instance
+  0.00      0.05     0.00        1     0.00     0.00  mouse_clicked
+  0.00      0.05     0.00        1     0.00     0.00  supports_extensions
+  0.00      0.05     0.00        1     0.00     0.00  supports_requested_validation_layers
+  0.00      0.05     0.00        1     0.00     0.00  supports_surface_format
+  0.00      0.05     0.00        1     0.00     0.00  translate_present_mode
 
  %         the percentage of the total running time of the
 time       program used by this function.
@@ -87,215 +89,214 @@ notice and this notice are preserved.
 		     Call graph (explanation follows)
 
 
-granularity: each sample hit covers 4 byte(s) for 50.00% of 0.02 seconds
+granularity: each sample hit covers 4 byte(s) for 20.00% of 0.05 seconds
 
 index % time    self  children    called     name
-                0.02    0.00    5336/5336        aurora_session_start [2]
-[1]    100.0    0.02    0.00    5336         draw_frame [1]
-                0.00    0.00    5336/5336        record_command_buffer [5]
-                0.00    0.00      43/43          recreate_swapchain [11]
+                0.02    0.03    7547/7547        aurora_session_start [2]
+[1]    100.0    0.02    0.03    7547         draw_frame [1]
+                0.03    0.00    7547/7547        record_command_buffer [4]
 -----------------------------------------------
-                0.00    0.02       1/1           main [3]
-[2]    100.0    0.00    0.02       1         aurora_session_start [2]
-                0.02    0.00    5336/5336        draw_frame [1]
+                0.00    0.05       1/1           main [3]
+[2]    100.0    0.00    0.05       1         aurora_session_start [2]
+                0.02    0.03    7547/7547        draw_frame [1]
 -----------------------------------------------
                                                  <spontaneous>
-[3]    100.0    0.00    0.02                 main [3]
-                0.00    0.02       1/1           aurora_session_start [2]
-                0.00    0.00       1/1           aurora_config_create [20]
-                0.00    0.00       1/1           aurora_config_set_window_allow_resize [24]
-                0.00    0.00       1/1           aurora_config_enable_default_validation_layers [23]
-                0.00    0.00       1/1           aurora_config_set_window_size [25]
-                0.00    0.00       1/1           aurora_config_enable_default_extensions [22]
-                0.00    0.00       1/1           aurora_config_allow_queue_sharing [19]
-                0.00    0.00       1/1           aurora_session_create [26]
-                0.00    0.00       1/1           aurora_session_destroy [27]
-                0.00    0.00       1/1           aurora_config_destroy [21]
+[3]    100.0    0.00    0.05                 main [3]
+                0.00    0.05       1/1           aurora_session_start [2]
+                0.00    0.00       1/1           aurora_config_create [14]
+                0.00    0.00       1/1           aurora_config_set_window_allow_resize [19]
+                0.00    0.00       1/1           aurora_config_set_window_size [20]
+                0.00    0.00       1/1           aurora_config_enable_default_validation_layers [17]
+                0.00    0.00       1/1           aurora_config_enable_default_extensions [16]
+                0.00    0.00       1/1           aurora_config_allow_queue_sharing [13]
+                0.00    0.00       1/1           get_vertices [28]
+                0.00    0.00       1/1           get_indices [26]
+                0.00    0.00       1/1           aurora_config_set_vertices [18]
+                0.00    0.00       1/1           aurora_session_create [22]
+                0.00    0.00       1/1           aurora_session_destroy [23]
+                0.00    0.00       1/1           aurora_config_destroy [15]
 -----------------------------------------------
-                0.00    0.00       1/5337        init_index_buffer [38]
-                0.00    0.00    5336/5337        record_command_buffer [5]
-[4]      0.0    0.00    0.00    5337         get_index_count [4]
+                0.03    0.00    7547/7547        draw_frame [1]
+[4]     60.0    0.03    0.00    7547         record_command_buffer [4]
 -----------------------------------------------
-                0.00    0.00    5336/5336        draw_frame [1]
-[5]      0.0    0.00    0.00    5336         record_command_buffer [5]
-                0.00    0.00    5336/5337        get_index_count [4]
+                0.00    0.00       4/8           init_vertex_buffer [11]
+                0.00    0.00       4/8           init_index_buffer [10]
+[5]      0.0    0.00    0.00       8         create_buffer [5]
+                0.00    0.00       8/8           find_memory_type [6]
 -----------------------------------------------
-                0.00    0.00       1/44          aurora_session_create [26]
-                0.00    0.00      43/44          recreate_swapchain [11]
-[6]      0.0    0.00    0.00      44         init_frame_buffers [6]
+                0.00    0.00       8/8           create_buffer [5]
+[6]      0.0    0.00    0.00       8         find_memory_type [6]
 -----------------------------------------------
-                0.00    0.00       1/44          aurora_session_create [26]
-                0.00    0.00      43/44          recreate_swapchain [11]
-[7]      0.0    0.00    0.00      44         init_image_views [7]
+                0.00    0.00       2/4           init_vertex_buffer [11]
+                0.00    0.00       2/4           init_index_buffer [10]
+[7]      0.0    0.00    0.00       4         copy_buffer [7]
 -----------------------------------------------
-                0.00    0.00       1/44          aurora_session_create [26]
-                0.00    0.00      43/44          recreate_swapchain [11]
-[8]      0.0    0.00    0.00      44         init_images [8]
+                0.00    0.00       2/2           init_graphics_pipeline [35]
+[8]      0.0    0.00    0.00       2         create_shader_module [8]
 -----------------------------------------------
-                0.00    0.00       1/44          aurora_session_create [26]
-                0.00    0.00      43/44          recreate_swapchain [11]
-[9]      0.0    0.00    0.00      44         init_swapchain [9]
-                0.00    0.00      44/44          translate_present_mode [10]
+                0.00    0.00       2/2           init_graphics_pipeline [35]
+[9]      0.0    0.00    0.00       2         fetch_file_size [9]
 -----------------------------------------------
-                0.00    0.00      44/44          init_swapchain [9]
-[10]     0.0    0.00    0.00      44         translate_present_mode [10]
+                0.00    0.00       1/2           aurora_session_add_vertices [21]
+                0.00    0.00       1/2           aurora_session_create [22]
+[10]     0.0    0.00    0.00       2         init_index_buffer [10]
+                0.00    0.00       4/8           create_buffer [5]
+                0.00    0.00       2/4           copy_buffer [7]
 -----------------------------------------------
-                0.00    0.00      43/43          draw_frame [1]
-[11]     0.0    0.00    0.00      43         recreate_swapchain [11]
-                0.00    0.00      43/44          init_swapchain [9]
-                0.00    0.00      43/44          init_images [8]
-                0.00    0.00      43/44          init_frame_buffers [6]
-                0.00    0.00      43/44          init_image_views [7]
+                0.00    0.00       1/2           aurora_session_add_vertices [21]
+                0.00    0.00       1/2           aurora_session_create [22]
+[11]     0.0    0.00    0.00       2         init_vertex_buffer [11]
+                0.00    0.00       4/8           create_buffer [5]
+                0.00    0.00       2/4           copy_buffer [7]
 -----------------------------------------------
-                0.00    0.00       2/4           init_vertex_buffer [44]
-                0.00    0.00       2/4           init_index_buffer [38]
-[12]     0.0    0.00    0.00       4         create_buffer [12]
-                0.00    0.00       4/4           find_memory_type [13]
------------------------------------------------
-                0.00    0.00       4/4           create_buffer [12]
-[13]     0.0    0.00    0.00       4         find_memory_type [13]
------------------------------------------------
-                0.00    0.00       1/2           init_vertex_buffer [44]
-                0.00    0.00       1/2           init_index_buffer [38]
-[14]     0.0    0.00    0.00       2         copy_buffer [14]
------------------------------------------------
-                0.00    0.00       2/2           init_graphics_pipeline [37]
-[15]     0.0    0.00    0.00       2         create_shader_module [15]
------------------------------------------------
-                0.00    0.00       2/2           init_graphics_pipeline [37]
-[16]     0.0    0.00    0.00       2         fetch_file_size [16]
------------------------------------------------
-                0.00    0.00       1/2           get_vertices [31]
-                0.00    0.00       1/2           init_vertex_buffer [44]
-[17]     0.0    0.00    0.00       2         get_vertex_count [17]
------------------------------------------------
-                0.00    0.00       2/2           init_graphics_pipeline [37]
-[18]     0.0    0.00    0.00       2         read_file [18]
+                0.00    0.00       2/2           init_graphics_pipeline [35]
+[12]     0.0    0.00    0.00       2         read_file [12]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[19]     0.0    0.00    0.00       1         aurora_config_allow_queue_sharing [19]
+[13]     0.0    0.00    0.00       1         aurora_config_allow_queue_sharing [13]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[20]     0.0    0.00    0.00       1         aurora_config_create [20]
+[14]     0.0    0.00    0.00       1         aurora_config_create [14]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[21]     0.0    0.00    0.00       1         aurora_config_destroy [21]
+[15]     0.0    0.00    0.00       1         aurora_config_destroy [15]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[22]     0.0    0.00    0.00       1         aurora_config_enable_default_extensions [22]
+[16]     0.0    0.00    0.00       1         aurora_config_enable_default_extensions [16]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[23]     0.0    0.00    0.00       1         aurora_config_enable_default_validation_layers [23]
+[17]     0.0    0.00    0.00       1         aurora_config_enable_default_validation_layers [17]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[24]     0.0    0.00    0.00       1         aurora_config_set_window_allow_resize [24]
+[18]     0.0    0.00    0.00       1         aurora_config_set_vertices [18]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[25]     0.0    0.00    0.00       1         aurora_config_set_window_size [25]
+[19]     0.0    0.00    0.00       1         aurora_config_set_window_allow_resize [19]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[26]     0.0    0.00    0.00       1         aurora_session_create [26]
-                0.00    0.00       1/1           init_glfw_window [36]
-                0.00    0.00       1/1           init_surface [42]
+[20]     0.0    0.00    0.00       1         aurora_config_set_window_size [20]
+-----------------------------------------------
+                0.00    0.00       1/1           mouse_clicked [46]
+[21]     0.0    0.00    0.00       1         aurora_session_add_vertices [21]
+                0.00    0.00       1/2           init_index_buffer [10]
+                0.00    0.00       1/2           init_vertex_buffer [11]
+-----------------------------------------------
+                0.00    0.00       1/1           main [3]
+[22]     0.0    0.00    0.00       1         aurora_session_create [22]
+                0.00    0.00       1/1           init_vertices [44]
+                0.00    0.00       1/1           init_glfw_window [34]
                 0.00    0.00       1/1           init_vk_instance [45]
-                0.00    0.00       1/1           init_physical_device [40]
-                0.00    0.00       1/1           init_logical_device [39]
-                0.00    0.00       1/44          init_swapchain [9]
-                0.00    0.00       1/44          init_image_views [7]
-                0.00    0.00       1/44          init_images [8]
-                0.00    0.00       1/1           init_render_pass [41]
-                0.00    0.00       1/1           init_graphics_pipeline [37]
-                0.00    0.00       1/1           init_command_pool [35]
-                0.00    0.00       1/44          init_frame_buffers [6]
-                0.00    0.00       1/1           init_vertex_buffer [44]
-                0.00    0.00       1/1           init_index_buffer [38]
+                0.00    0.00       1/1           init_surface [41]
+                0.00    0.00       1/1           init_physical_device [39]
+                0.00    0.00       1/1           init_logical_device [38]
+                0.00    0.00       1/1           init_images [37]
+                0.00    0.00       1/1           init_swapchain [42]
+                0.00    0.00       1/1           init_image_views [36]
+                0.00    0.00       1/1           init_render_pass [40]
+                0.00    0.00       1/1           init_frame_buffers [33]
+                0.00    0.00       1/1           init_graphics_pipeline [35]
+                0.00    0.00       1/1           init_command_pool [32]
+                0.00    0.00       1/2           init_vertex_buffer [11]
+                0.00    0.00       1/1           init_command_buffers [31]
+                0.00    0.00       1/2           init_index_buffer [10]
                 0.00    0.00       1/1           init_sync_objects [43]
-                0.00    0.00       1/1           init_command_buffers [34]
 -----------------------------------------------
                 0.00    0.00       1/1           main [3]
-[27]     0.0    0.00    0.00       1         aurora_session_destroy [27]
+[23]     0.0    0.00    0.00       1         aurora_session_destroy [23]
 -----------------------------------------------
-                0.00    0.00       1/1           init_graphics_pipeline [37]
-[28]     0.0    0.00    0.00       1         get_attribute_descriptions [28]
+                0.00    0.00       1/1           init_graphics_pipeline [35]
+[24]     0.0    0.00    0.00       1         get_attribute_descriptions [24]
 -----------------------------------------------
-                0.00    0.00       1/1           init_graphics_pipeline [37]
-[29]     0.0    0.00    0.00       1         get_binding_description [29]
+                0.00    0.00       1/1           init_graphics_pipeline [35]
+[25]     0.0    0.00    0.00       1         get_binding_description [25]
 -----------------------------------------------
-                0.00    0.00       1/1           init_index_buffer [38]
-[30]     0.0    0.00    0.00       1         get_vertex_indices [30]
+                0.00    0.00       1/1           main [3]
+[26]     0.0    0.00    0.00       1         get_indices [26]
 -----------------------------------------------
-                0.00    0.00       1/1           init_vertex_buffer [44]
-[31]     0.0    0.00    0.00       1         get_vertices [31]
-                0.00    0.00       1/2           get_vertex_count [17]
+                0.00    0.00       1/1           get_vertices [28]
+[27]     0.0    0.00    0.00       1         get_vertex_count [27]
 -----------------------------------------------
-                0.00    0.00       1/1           init_physical_device [40]
-[32]     0.0    0.00    0.00       1         has_graphics_queue [32]
+                0.00    0.00       1/1           main [3]
+[28]     0.0    0.00    0.00       1         get_vertices [28]
+                0.00    0.00       1/1           get_vertex_count [27]
 -----------------------------------------------
-                0.00    0.00       1/1           init_physical_device [40]
-[33]     0.0    0.00    0.00       1         has_present_queue [33]
+                0.00    0.00       1/1           init_physical_device [39]
+[29]     0.0    0.00    0.00       1         has_graphics_queue [29]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[34]     0.0    0.00    0.00       1         init_command_buffers [34]
+                0.00    0.00       1/1           init_physical_device [39]
+[30]     0.0    0.00    0.00       1         has_present_queue [30]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[35]     0.0    0.00    0.00       1         init_command_pool [35]
+                0.00    0.00       1/1           aurora_session_create [22]
+[31]     0.0    0.00    0.00       1         init_command_buffers [31]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[36]     0.0    0.00    0.00       1         init_glfw_window [36]
+                0.00    0.00       1/1           aurora_session_create [22]
+[32]     0.0    0.00    0.00       1         init_command_pool [32]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[37]     0.0    0.00    0.00       1         init_graphics_pipeline [37]
-                0.00    0.00       2/2           fetch_file_size [16]
-                0.00    0.00       2/2           read_file [18]
-                0.00    0.00       2/2           create_shader_module [15]
-                0.00    0.00       1/1           get_binding_description [29]
-                0.00    0.00       1/1           get_attribute_descriptions [28]
+                0.00    0.00       1/1           aurora_session_create [22]
+[33]     0.0    0.00    0.00       1         init_frame_buffers [33]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[38]     0.0    0.00    0.00       1         init_index_buffer [38]
-                0.00    0.00       2/4           create_buffer [12]
-                0.00    0.00       1/5337        get_index_count [4]
-                0.00    0.00       1/1           get_vertex_indices [30]
-                0.00    0.00       1/2           copy_buffer [14]
+                0.00    0.00       1/1           aurora_session_create [22]
+[34]     0.0    0.00    0.00       1         init_glfw_window [34]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[39]     0.0    0.00    0.00       1         init_logical_device [39]
+                0.00    0.00       1/1           aurora_session_create [22]
+[35]     0.0    0.00    0.00       1         init_graphics_pipeline [35]
+                0.00    0.00       2/2           fetch_file_size [9]
+                0.00    0.00       2/2           read_file [12]
+                0.00    0.00       2/2           create_shader_module [8]
+                0.00    0.00       1/1           get_binding_description [25]
+                0.00    0.00       1/1           get_attribute_descriptions [24]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[40]     0.0    0.00    0.00       1         init_physical_device [40]
-                0.00    0.00       1/1           has_graphics_queue [32]
-                0.00    0.00       1/1           has_present_queue [33]
-                0.00    0.00       1/1           supports_extensions [46]
-                0.00    0.00       1/1           supports_surface_format [48]
+                0.00    0.00       1/1           aurora_session_create [22]
+[36]     0.0    0.00    0.00       1         init_image_views [36]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[41]     0.0    0.00    0.00       1         init_render_pass [41]
+                0.00    0.00       1/1           aurora_session_create [22]
+[37]     0.0    0.00    0.00       1         init_images [37]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[42]     0.0    0.00    0.00       1         init_surface [42]
+                0.00    0.00       1/1           aurora_session_create [22]
+[38]     0.0    0.00    0.00       1         init_logical_device [38]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
+                0.00    0.00       1/1           aurora_session_create [22]
+[39]     0.0    0.00    0.00       1         init_physical_device [39]
+                0.00    0.00       1/1           has_graphics_queue [29]
+                0.00    0.00       1/1           has_present_queue [30]
+                0.00    0.00       1/1           supports_extensions [47]
+                0.00    0.00       1/1           supports_surface_format [49]
+-----------------------------------------------
+                0.00    0.00       1/1           aurora_session_create [22]
+[40]     0.0    0.00    0.00       1         init_render_pass [40]
+-----------------------------------------------
+                0.00    0.00       1/1           aurora_session_create [22]
+[41]     0.0    0.00    0.00       1         init_surface [41]
+-----------------------------------------------
+                0.00    0.00       1/1           aurora_session_create [22]
+[42]     0.0    0.00    0.00       1         init_swapchain [42]
+                0.00    0.00       1/1           translate_present_mode [50]
+-----------------------------------------------
+                0.00    0.00       1/1           aurora_session_create [22]
 [43]     0.0    0.00    0.00       1         init_sync_objects [43]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
-[44]     0.0    0.00    0.00       1         init_vertex_buffer [44]
-                0.00    0.00       2/4           create_buffer [12]
-                0.00    0.00       1/2           get_vertex_count [17]
-                0.00    0.00       1/1           get_vertices [31]
-                0.00    0.00       1/2           copy_buffer [14]
+                0.00    0.00       1/1           aurora_session_create [22]
+[44]     0.0    0.00    0.00       1         init_vertices [44]
 -----------------------------------------------
-                0.00    0.00       1/1           aurora_session_create [26]
+                0.00    0.00       1/1           aurora_session_create [22]
 [45]     0.0    0.00    0.00       1         init_vk_instance [45]
-                0.00    0.00       1/1           supports_requested_validation_layers [47]
+                0.00    0.00       1/1           supports_requested_validation_layers [48]
 -----------------------------------------------
-                0.00    0.00       1/1           init_physical_device [40]
-[46]     0.0    0.00    0.00       1         supports_extensions [46]
+                0.00    0.00       1/1           mouse_button_callback [72]
+[46]     0.0    0.00    0.00       1         mouse_clicked [46]
+                0.00    0.00       1/1           aurora_session_add_vertices [21]
+-----------------------------------------------
+                0.00    0.00       1/1           init_physical_device [39]
+[47]     0.0    0.00    0.00       1         supports_extensions [47]
 -----------------------------------------------
                 0.00    0.00       1/1           init_vk_instance [45]
-[47]     0.0    0.00    0.00       1         supports_requested_validation_layers [47]
+[48]     0.0    0.00    0.00       1         supports_requested_validation_layers [48]
 -----------------------------------------------
-                0.00    0.00       1/1           init_physical_device [40]
-[48]     0.0    0.00    0.00       1         supports_surface_format [48]
+                0.00    0.00       1/1           init_physical_device [39]
+[49]     0.0    0.00    0.00       1         supports_surface_format [49]
+-----------------------------------------------
+                0.00    0.00       1/1           init_swapchain [42]
+[50]     0.0    0.00    0.00       1         translate_present_mode [50]
 -----------------------------------------------
 
  This table describes the call tree of the program, and was sorted by
@@ -388,19 +389,20 @@ notice and this notice are preserved.
 
 Index by function name
 
-  [19] aurora_config_allow_queue_sharing [28] get_attribute_descriptions [39] init_logical_device
-  [20] aurora_config_create   [29] get_binding_description [40] init_physical_device
-  [21] aurora_config_destroy   [4] get_index_count        [41] init_render_pass
-  [22] aurora_config_enable_default_extensions [17] get_vertex_count [42] init_surface
-  [23] aurora_config_enable_default_validation_layers [30] get_vertex_indices [9] init_swapchain
-  [24] aurora_config_set_window_allow_resize [31] get_vertices [43] init_sync_objects
-  [25] aurora_config_set_window_size [32] has_graphics_queue [44] init_vertex_buffer
-  [26] aurora_session_create  [33] has_present_queue      [45] init_vk_instance
-  [27] aurora_session_destroy [34] init_command_buffers   [18] read_file
-   [2] aurora_session_start   [35] init_command_pool       [5] record_command_buffer
-  [14] copy_buffer             [6] init_frame_buffers     [11] recreate_swapchain
-  [12] create_buffer          [36] init_glfw_window       [46] supports_extensions
-  [15] create_shader_module   [37] init_graphics_pipeline [47] supports_requested_validation_layers
-   [1] draw_frame              [7] init_image_views       [48] supports_surface_format
-  [16] fetch_file_size         [8] init_images            [10] translate_present_mode
-  [13] find_memory_type       [38] init_index_buffer
+  [13] aurora_config_allow_queue_sharing [6] find_memory_type [39] init_physical_device
+  [14] aurora_config_create   [24] get_attribute_descriptions [40] init_render_pass
+  [15] aurora_config_destroy  [25] get_binding_description [41] init_surface
+  [16] aurora_config_enable_default_extensions [26] get_indices [42] init_swapchain
+  [17] aurora_config_enable_default_validation_layers [27] get_vertex_count [43] init_sync_objects
+  [18] aurora_config_set_vertices [28] get_vertices       [11] init_vertex_buffer
+  [19] aurora_config_set_window_allow_resize [29] has_graphics_queue [44] init_vertices
+  [20] aurora_config_set_window_size [30] has_present_queue [45] init_vk_instance
+  [21] aurora_session_add_vertices [31] init_command_buffers [46] mouse_clicked
+  [22] aurora_session_create  [32] init_command_pool      [12] read_file
+  [23] aurora_session_destroy [33] init_frame_buffers      [4] record_command_buffer
+   [2] aurora_session_start   [34] init_glfw_window       [47] supports_extensions
+   [7] copy_buffer            [35] init_graphics_pipeline [48] supports_requested_validation_layers
+   [5] create_buffer          [36] init_image_views       [49] supports_surface_format
+   [8] create_shader_module   [37] init_images            [50] translate_present_mode
+   [1] draw_frame             [10] init_index_buffer
+   [9] fetch_file_size        [38] init_logical_device

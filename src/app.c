@@ -62,7 +62,7 @@ int main(){
 	aurora_config_allow_queue_sharing(config, true);
 	aurora_config_set_vertices(config, get_vertices(), 4, get_indices(), 6);
 	AuroraSession *session = aurora_session_create(config);
-
+	Node *tree = create_tree(800, 600, true);
 	aurora_session_start(config, session);
 	
 	aurora_session_destroy(session);

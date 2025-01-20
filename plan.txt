@@ -1,0 +1,5 @@
+make a library called glee for glfw, with a respective glee.h
+
+make a library called (name here) for 2D vulkan rendering to a window
+
+make a library called aurora for easy to create 2D UIs

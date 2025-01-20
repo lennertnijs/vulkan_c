@@ -1,26 +1,50 @@
 #include "aurora.h"
+
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "aurora_internal.h"
-
-typedef enum Rotation {
+enum Rotation {
 	HORIZONTAL,
 	VERTICAL
-} Rotation;
+};
 
 struct Node {
 	int x;
 	int y;
 	int width;
 	int height;
-	Rotation rotation;
+	bool horizontal;
 	Node *parent;
 	Node **children;
 	int child_count;
 	int capacity;
 };
+
+const int default_capacity = 8;
+
+Node *create_tree(int width, int height, bool horizontal){
+	Node *node = malloc(sizeof(Node));
+	*node = (Node){
+		.x = 0,
+		.y = 0,
+		.width = width,
+		.height = height,
+		.horizontal = horizontal,
+		.parent = NULL,
+		.children = NULL,
+		.child_count = 0,
+		.capacity = default_capacity
+	};
+	return node;
+}
+
+// destroy the tree, dawg
+
+void split_node(Node *node, int x, int y){
+	// check is within
+	
+}
 
 bool is_within(Node *outside, Node *inside){
 	return outside->x <= inside->x && outside->y <= inside->y && outside->x + outside->width >= inside->x + inside->width && outside->y + outside->height >= inside->y + inside->height;
@@ -34,6 +58,9 @@ void add_child(Node *parent, Node *child){
 	if(child == NULL){
 		printf("Cannot add a NULL child Node to a parent Node.\n");
 		return;
+	}
+	if(parent->children == NULL){
+		parent->children = malloc(sizeof(Node) * parent->capacity);
 	}
 	if(!is_within(parent, child)){
 		printf("The child Node is not fully contained by the parent Node.");
@@ -49,46 +76,4 @@ void add_child(Node *parent, Node *child){
 		free(children);
 		parent->children[parent->child_count++] = child;
 	}
-}
-
-void mouse_clicked(AuroraSession *session, double x, double y){
-//	printf("The following was clicked: %f, %f\n", x, y);
-	Vertex *vertices = malloc(sizeof(Vertex) * 4);
-	vertices[0] = (Vertex){
-		.position.x = 0.9f,
-		.position.y = 0.7f,
-		.color.x = 1.0f,
-		.color.y = 1.0f,
-		.color.z = 0.0f
-	};
-	
-	vertices[1] = (Vertex){
-		.position.x = 0.9f,
-		.position.y = 0.9f,
-		.color.x = 1.0f,
-		.color.y = 1.0f,
-		.color.z = 0.0f
-	};
-	vertices[2] = (Vertex){
-		.position.x = 0.7f,
-		.position.y = 0.9f,
-		.color.x = 1.0f,
-		.color.y = 1.0f,
-		.color.z = 0.0f
-	};
-	vertices[3] = (Vertex){	
-		.position.x = 0.7f,
-		.position.y = 0.7f,
-		.color.x = 1.0f,
-		.color.y = 0.0f,
-		.color.z = 1.0f
-	};
-	uint16_t *indices = malloc(sizeof(uint16_t) * 6);
-	indices[0] = 4;
-	indices[1] = 5;
-	indices[2] = 6;
-	indices[3] = 6;
-	indices[4] = 7;
-	indices[5] = 4;
-	aurora_session_add_vertices(session, vertices, 6, indices, 6);
 }

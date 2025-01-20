@@ -19,7 +19,10 @@ typedef struct {
 
 typedef struct AuroraConfig AuroraConfig;
 typedef struct AuroraSession AuroraSession;
+typedef struct Node Node;
 
+
+void mouse_clicked(AuroraSession *session, double x, double y);
 extern AuroraConfig *aurora_config_create();
 extern void aurora_config_destroy(AuroraConfig *config);
 
@@ -49,4 +52,8 @@ extern AuroraSession *aurora_session_create(AuroraConfig *config);
 extern void aurora_session_start(AuroraConfig *config, AuroraSession *session);
 extern void aurora_session_destroy(AuroraSession *session);
 extern void aurora_session_add_vertices(AuroraSession *session, Vertex *vertices, int vertex_count, uint16_t *indices, int index_count);
+
+
+extern Node *create_tree(int width, int height, bool horizontal);
+extern void split_node(Node *node, int x, int y);
 #endif
