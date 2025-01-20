@@ -1,8 +1,8 @@
-#ifndef AURORA_INTERNAL_CONFIG_H
-#define AURORA_INTERNAL_CONFIG_H
+#ifndef AURORA_CONFIG_H
+#define AURORA_CONFIG_H
 
 #include <stdbool.h>
-
+#include "aurora.h"
 struct AuroraConfig {
 	bool enable_validation_layers;
     const char** validation_layers;

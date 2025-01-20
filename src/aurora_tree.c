@@ -39,15 +39,11 @@ Node *create_tree(int width, int height, bool horizontal){
 	return node;
 }
 
-// destroy the tree, dawg
-
-void split_node(Node *node, int x, int y){
-	// check is within
-	
-}
-
-bool is_within(Node *outside, Node *inside){
+bool is_inside_node(Node *outside, Node *inside){
 	return outside->x <= inside->x && outside->y <= inside->y && outside->x + outside->width >= inside->x + inside->width && outside->y + outside->height >= inside->y + inside->height;
+}
+bool is_within(Node *node, int x, int y){
+	return node->x <= x && node->y <= y && node->x + node->width >= x && node->y + node->height >= y;
 }
 
 void add_child(Node *parent, Node *child){
@@ -62,7 +58,7 @@ void add_child(Node *parent, Node *child){
 	if(parent->children == NULL){
 		parent->children = malloc(sizeof(Node) * parent->capacity);
 	}
-	if(!is_within(parent, child)){
+	if(!is_inside_node(parent, child)){
 		printf("The child Node is not fully contained by the parent Node.");
 		return;
 	}
@@ -76,4 +72,31 @@ void add_child(Node *parent, Node *child){
 		free(children);
 		parent->children[parent->child_count++] = child;
 	}
+}
+
+void split_node(Node *parent, double x, double y){
+	Node *clicked;
+	for(int i = 0; i < parent->child_count; i++){
+		if(is_within(parent->children[i], (int) x, (int) y)){
+			clicked = parent->children[i];
+		}
+	}
+	Node *new = malloc(sizeof(Node));
+	if(parent->horizontal){
+		new->x = clicked->x;
+		new->y = (int)y;
+		clicked->height = (int)y - clicked->y; 
+		new->height = clicked->height + clicked->y - (int)y;
+		new->width = clicked->width;
+		new->horizontal = true;
+	}else{
+		new->x = (int)x;
+		new->y = clicked->y;
+		clicked->width = (int)x - clicked->x;
+		new->height = clicked->height + clicked->y - (int)y;
+		new->width = clicked->width + clicked->x - (int)x;
+		new->horizontal = false;
+	}
+	new->parent = parent;
+	add_child(parent, new);
 }

@@ -1,9 +1,12 @@
 #ifndef AURORA_H
 #define AURORA_H
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <assert.h>
 #include "vec.c"
 typedef enum PresentMode {
 	IMMEDIATE,
@@ -20,7 +23,6 @@ typedef struct {
 typedef struct AuroraConfig AuroraConfig;
 typedef struct AuroraSession AuroraSession;
 typedef struct Node Node;
-
 
 void mouse_clicked(AuroraSession *session, double x, double y);
 extern AuroraConfig *aurora_config_create();
@@ -55,5 +57,4 @@ extern void aurora_session_add_vertices(AuroraSession *session, Vertex *vertices
 
 
 extern Node *create_tree(int width, int height, bool horizontal);
-extern void split_node(Node *node, int x, int y);
 #endif

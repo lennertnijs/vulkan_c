@@ -67,6 +67,7 @@ int main(){
 	
 	aurora_session_destroy(session);
 	aurora_config_destroy(config);
+	
 	return 0;
 }
 

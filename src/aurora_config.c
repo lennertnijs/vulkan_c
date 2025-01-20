@@ -1,8 +1,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "aurora.h"
-#include "aurora_internal_config.h"
+
+#include "aurora_config.h"
 
 const int default_validation_layer_count = 1;
 const char *default_validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
