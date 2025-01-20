@@ -17,12 +17,12 @@ struct AuroraConfig {
 	uint32_t api_version;
 	const char** extensions;
 	int extension_count;
-	int graphics_queue_count;
-	int present_queue_count;
-	int compute_queue_count;
-	int transfer_queue_count;
 	bool allow_queue_sharing;
 	PresentMode present_mode;
 	int image_count;		
+	Vertex *vertices;
+	int vertex_count;
+	uint16_t *indices;
+	int index_count;
 };
 #endif

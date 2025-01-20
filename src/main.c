@@ -724,26 +724,21 @@ void record_command_buffer(VkContext *context, uint32_t image_index){
 	begin_info.pInheritanceInfo = NULL;
 	VkResult result = vkBeginCommandBuffer(context->command_buffers[current_frame], &begin_info);
 	assert(result == VK_SUCCESS);
-
 	VkRenderPassBeginInfo render_pass_info = {};
 	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	render_pass_info.renderPass = context->render_pass;
 	render_pass_info.framebuffer = context->frame_buffers[image_index];
 	render_pass_info.renderArea.offset = (VkOffset2D){0, 0};
 	render_pass_info.renderArea.extent = context->swapchain_info.image_extent;
-	
 	VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
 	render_pass_info.clearValueCount = 1;
 	render_pass_info.pClearValues = &clear_color;
-	
 	vkCmdBeginRenderPass(context->command_buffers[current_frame], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindPipeline(context->command_buffers[current_frame], VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
-
 	VkBuffer vertex_buffers[] = {context->vertex_buffer};
 	VkDeviceSize offsets[] = {0};
 	vkCmdBindVertexBuffers(context->command_buffers[current_frame], 0, 1, vertex_buffers, offsets);
 	vkCmdBindIndexBuffer(context->command_buffers[current_frame], context->index_buffer, 0, VK_INDEX_TYPE_UINT16);
-	
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -752,7 +747,6 @@ void record_command_buffer(VkContext *context, uint32_t image_index){
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(context->command_buffers[current_frame], 0, 1, &viewport);
-	
 	VkRect2D scissor = {};
 	scissor.offset = (VkOffset2D){0, 0};
 	scissor.extent = context->swapchain_info.image_extent;

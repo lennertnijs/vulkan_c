@@ -26,13 +26,12 @@ AuroraConfig *aurora_config_create(){
         .api_version = 4194304,
 		.extensions = NULL,
 		.extension_count = 0,
-        .graphics_queue_count = 1,
-		.present_queue_count = 1,
-        .compute_queue_count = 1,
-        .transfer_queue_count = 1,
         .allow_queue_sharing = false,
 		.present_mode = MAILBOX,
-		.image_count = 2
+		.image_count = 2,
+		.vertices = NULL,
+		.vertex_count = 0,
+		.indices = NULL
     };
     return config;
 }
@@ -93,23 +92,6 @@ void aurora_config_set_extensions(AuroraConfig *config, const char **names, int 
 	config->extension_count = amount;
 }
 
-
-void aurora_config_set_graphics_queue_count(AuroraConfig *config, int amount){
-	config->graphics_queue_count = amount;
-}
-
-void aurora_config_set_present_queue_count(AuroraConfig *config, int amount){
-	config->present_queue_count = amount;
-}
-
-void aurora_config_set_compute_queue_count(AuroraConfig *config, int amount){
-	config->compute_queue_count = amount;
-}
-
-void aurora_config_set_transfer_queue_count(AuroraConfig *config, int amount){
-	config->transfer_queue_count = amount;
-}
-
 void aurora_config_allow_queue_sharing(AuroraConfig *config, bool allow_sharing){
 	config->allow_queue_sharing = allow_sharing;
 }
@@ -121,4 +103,11 @@ void aurora_config_set_present_mode(AuroraConfig *config, PresentMode present_mo
 
 void aurora_config_set_image_count(AuroraConfig *config, int amount){
 	config->image_count = amount;
+}
+
+void aurora_config_set_vertices(AuroraConfig *config, Vertex *vertices, int amount, uint16_t *indices, int index_count){
+	config->vertices = vertices;
+	config->vertex_count = amount;
+	config->indices = indices;
+	config->index_count = index_count;
 }

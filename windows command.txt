@@ -1,0 +1,1 @@
+x86_64-w64-mingw32-gcc src/app.c src/aurora_internal_config.c src/aurora_internal_session.c src/aurora_ui.c     -I/mnt/d/vulkan/Include     -I/mnt/d/glfw/glfw-3.4.bin.WIN64/include     -L/mnt/d/glfw/glfw-3.4.bin.WIN64/lib-mingw-w64     -L/mnt/d/vulkan/Lib     -lvulkan-1 -lglfw3 -luser32 -lgdi32 -o /mnt/d/vulkan_c/app.exe
