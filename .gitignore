@@ -1,0 +1,5 @@
+# Ignore GLFW directory
+GLFW/
+
+# Ignore vulkan directory
+vulkan/
