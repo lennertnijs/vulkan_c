@@ -1,15 +1,16 @@
-#include "aurora.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 enum Rotation {
 	HORIZONTAL,
 	VERTICAL
 };
 
-struct Node {
+typedef struct Node Node;
+
+struct Node{
 	int x;
 	int y;
 	int width;

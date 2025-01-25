@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "aurora_config.h"
+#include "aurora_internal.h"
 
 const int default_validation_layer_count = 1;
 const char *default_validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
@@ -27,7 +27,6 @@ AuroraConfig *aurora_config_create(){
 		.extensions = NULL,
 		.extension_count = 0,
         .allow_queue_sharing = false,
-		.present_mode = FIFO,
 		.image_count = 2,
 		.vertices = NULL,
 		.vertex_count = 0,
@@ -94,11 +93,6 @@ void aurora_config_set_extensions(AuroraConfig *config, const char **names, int 
 
 void aurora_config_allow_queue_sharing(AuroraConfig *config, bool allow_sharing){
 	config->allow_queue_sharing = allow_sharing;
-}
-
-
-void aurora_config_set_present_mode(AuroraConfig *config, PresentMode present_mode){
-	config->present_mode = present_mode;
 }
 
 void aurora_config_set_image_count(AuroraConfig *config, int amount){
