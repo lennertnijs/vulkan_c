@@ -455,10 +455,10 @@ VkVertexInputAttributeDescription* get_attribute_descriptions(){
 }
 
 void create_graphics_pipeline(VkConfig *config, VkSession *session){
-	size_t vert_shader_length = fetch_file_size("src/vert.spv");
-	char *vert_shader_code = read_file("src/vert.spv", vert_shader_length);
-	size_t frag_shader_length = fetch_file_size("src/frag.spv");
-	char *frag_shader_code = read_file("src/frag.spv", frag_shader_length);
+	size_t vert_shader_length = fetch_file_size("src/shader/vert.spv");
+	char *vert_shader_code = read_file("src/shader/vert.spv", vert_shader_length);
+	size_t frag_shader_length = fetch_file_size("src/shader/frag.spv");
+	char *frag_shader_code = read_file("src/shader/frag.spv", frag_shader_length);
 	VkShaderModule vertex_shader_module = create_shader_module(session, vert_shader_code, vert_shader_length);
 	VkShaderModule fragment_shader_module = create_shader_module(session, frag_shader_code, frag_shader_length);
 	
