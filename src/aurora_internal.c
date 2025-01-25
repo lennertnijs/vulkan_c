@@ -1,6 +1,5 @@
 #include "aurora_internal.h"
-
-VkSession *vkSession;
+#include "aurora_vulkan.h"
 
 void window_resize_callback(GLFWwindow *window, int width, int height){
 	width = width;
@@ -25,21 +24,27 @@ void mouse_click_callback(GLFWwindow *window, int button, int action, int mods){
 	//glfwSetMouseButtonCallback(window, mouse_click_callback);
 	//glfwSetFramebufferSizeCallback(window, window_resize_callback);
 
-AuroraSession *aurora_session_create(AuroraConfig *config){
-	glfwInit();
-	VkConfig vkConfig = {};
-	vkSession = create_vulkan_session(vkConfig);
-}
-
-
-void aurora_session_start(AuroraConfig *config, AuroraSession *session){
-	while(!glfwWindowShouldClose(get_window(vkSession))) {
+void aurora_session_start(AuroraConfig *config){
+    glfwInit();
+    uint32_t glfw_extension_count = 0;
+    const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+	VkConfig vkConfig = {
+        .enable_validation_layers = config->enable_validation_layers,
+        .application_name = config->application_name,
+        .glfw_extension_count = glfw_extension_count,
+        .glfw_extensions = glfw_extensions,
+        .vertex_count = config->vertex_count,
+        .vertices = config->vertices,
+        .index_count = config->index_count,
+        .indices = config->indices
+    };
+    VkSession *session = vulkan_session_create(&vkConfig);
+    printf("Test succeeded\n");
+	while(!glfwWindowShouldClose(vulkan_session_get_window(session))) {
         glfwPollEvents();
-		vulkan_session_draw_frame(config, vkSession, false);
+		vulkan_session_draw_frame(&vkConfig, session, false);
+        // handle possible inputs -> tree
     }
-}
-
-void aurora_session_destroy(AuroraSession *session){
-	vulkan_session_destroy(vkSession);
+    vulkan_session_destroy(session);
 	glfwTerminate();
 }

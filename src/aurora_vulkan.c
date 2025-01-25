@@ -62,6 +62,7 @@ void create_vk_instance(VkConfig *config, VkSession *session){
     app_info.pApplicationName = config->application_name;
 	app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	app_info.pEngineName = "Not an engine";
+	app_info.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 	
     VkInstanceCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -255,14 +256,15 @@ void create_logical_device(VkConfig *config, VkSession *session){
 	vkGetDeviceQueue(session->logical_device, session->present_queue_index, 0, &session->present_queue);
 }
 
-void create_swapchain(VkSession *session){
+void create_swapchain(VkSession *session)
+{
 	VkSurfaceCapabilitiesKHR capabilities= {};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(session->physical_device, session->surface, &capabilities);
 
 	session->image_count = capabilities.minImageCount + 1;
 	if(capabilities.maxImageCount != 0 && session->image_count > capabilities.maxImageCount){
 		session->image_count = capabilities.minImageCount;
-	
+	}
 	if(capabilities.currentExtent.width != UINT32_MAX){
 		session->image_extent = capabilities.currentExtent;
 	}else{
@@ -334,16 +336,15 @@ void create_swapchain(VkSession *session){
 		printf("Swapchain creation failed.\n");
 		abort();
 	}
-
 	uint32_t count = 0;
 	vkGetSwapchainImagesKHR(session->logical_device, session->swapchain, &count, NULL);
 	if(count == 0){
 		printf("No images in the swapchain.\n");
 		abort();
 	}
+	printf("%u\n", count);
 	session->images = malloc(sizeof(VkImage) * count);
 	vkGetSwapchainImagesKHR(session->logical_device, session->swapchain, &count, session->images);
-	}
 }
 
 void create_image_views(VkSession *session){
@@ -934,7 +935,9 @@ VkSession *vulkan_session_create(VkConfig *config){
 	select_physical_device(session);
 	create_logical_device(config, session);
 	create_swapchain(session);
+	printf("xd1\n");
 	create_image_views(session);
+	printf("xd2\n");
 	create_render_pass(session);
 	create_graphics_pipeline(config, session);
 	create_framebuffers(session);
@@ -946,7 +949,7 @@ VkSession *vulkan_session_create(VkConfig *config){
 	return session;
 }
 
-GLFWwindow *vulkan_session_get_window(VkSession *session){	
+GLFWwindow *vulkan_session_get_window(VkSession *session){
 	return session->window;
 }
 

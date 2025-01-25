@@ -54,17 +54,13 @@ Vertex* get_vertices(){
 
 int main(){
 	AuroraConfig *config = aurora_config_create();
-	aurora_config_set_window_allow_resize(config, true);
+	aurora_config_set_window_allow_resize(config, false);
 	aurora_config_set_window_size(config, 800, 600);
 	aurora_config_enable_default_validation_layers(config);
-	aurora_config_enable_default_extensions(config);
-	aurora_config_allow_queue_sharing(config, true);
 	aurora_config_set_vertices(config, get_vertices(), 4, get_indices(), 6);
-	AuroraSession *session = aurora_session_create(config);
 
-	aurora_session_start(config, session);
+	aurora_session_start(config);
 	
-	aurora_session_destroy(session);
 	aurora_config_destroy(config);
 	
 	return 0;
