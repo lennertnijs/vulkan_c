@@ -1,5 +1,6 @@
 #include "aurora_internal.h"
 #include "aurora_vulkan.h"
+#include "aurora_tree.c"
 
 void window_resize_callback(GLFWwindow *window, int width, int height){
 	width = width;
@@ -11,18 +12,13 @@ void mouse_click_callback(GLFWwindow *window, int button, int action, int mods){
 	if(action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_LEFT){	
 		double x, y;
 		glfwGetCursorPos(window, &x, &y);
-		// report back!
+		printf("aight you clicked.\n");
 	}
 }
 
-	//if(config->allow_resize){
-		//glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-	//}else{
-		//glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	//}
-	//glfwSetWindowUserPointer(window, session);
-	//glfwSetMouseButtonCallback(window, mouse_click_callback);
-	//glfwSetFramebufferSizeCallback(window, window_resize_callback);
+void aurora_session_add_vertices(AuroraSession *session, Vertex *vertices, int vertex_count, uint16_t *indices, int index_count){
+	add_vertices(session->vk_session, vertices, vertex_count, indices, index_count);
+}
 
 void aurora_session_start(AuroraConfig *config){
     glfwInit();
@@ -40,6 +36,10 @@ void aurora_session_start(AuroraConfig *config){
     };
     VkSession *session = vulkan_session_create(&vkConfig);
     printf("Test succeeded\n");
+	Tree *tree = create_tree(800, 600);
+	glfwSetMouseButtonCallback(session->window, mouse_click_callback);
+	glfwSetWindowUserPointer(session->window, session);
+	glfwSetFramebufferSizeCallback(session->window, window_resize_callback);
 	while(!glfwWindowShouldClose(vulkan_session_get_window(session))) {
         glfwPollEvents();
 		vulkan_session_draw_frame(&vkConfig, session, false);

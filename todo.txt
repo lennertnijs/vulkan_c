@@ -1,0 +1,8 @@
+-- Roadmap aurora -- 
+1) Add a way to add vertices/indices to aurora_vulkan.c
+2) Build the Tree to store UI elements (basics, so rectangles)
+3) Link the tree with vulkan -> when the user clicks, it adds a line.
+4) Add node selection -> the user has an active node in which they can click to add or remove UI elements
+5) Add button support in the tree (clicking just shows it works through a print or something)
+6) Add vulkan texture support to slap textures onto ui elements
+7) Add dropdown menus onto buttons / right click

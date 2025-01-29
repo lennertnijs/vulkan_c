@@ -26,4 +26,5 @@ extern void aurora_config_set_vertices(AuroraConfig *config, Vertex *vertices, i
 
 extern void aurora_session_start(AuroraConfig *config);
 extern void aurora_session_add_vertices(AuroraSession *session, Vertex *vertices, int vertex_count, uint16_t *indices, int index_count);
+
 #endif

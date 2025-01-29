@@ -931,13 +931,11 @@ VkSession *vulkan_session_create(VkConfig *config){
 	init_vertices(config, session);
 	create_vk_instance(config, session);
 	create_window(session);
-	create_surface(session); // fix this
+	create_surface(session);
 	select_physical_device(session);
 	create_logical_device(config, session);
 	create_swapchain(session);
-	printf("xd1\n");
 	create_image_views(session);
-	printf("xd2\n");
 	create_render_pass(session);
 	create_graphics_pipeline(config, session);
 	create_framebuffers(session);
