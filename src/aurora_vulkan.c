@@ -349,7 +349,7 @@ void create_swapchain(VkSession *session)
 
 void create_image_views(VkSession *session){
 	session->image_views = malloc(sizeof(VkImageView) * session->image_count);
-	for(int i = 0; i < session->image_count; i++){
+	for(uint32_t i = 0; i < session->image_count; i++){
 		VkImageViewCreateInfo create_info = {};
 		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		create_info.image = session->images[i];
@@ -455,7 +455,7 @@ VkVertexInputAttributeDescription* get_attribute_descriptions(){
 	return attribute_descriptions;
 }
 
-void create_graphics_pipeline(VkConfig *config, VkSession *session){
+void create_graphics_pipeline(VkSession *session){
 	size_t vert_shader_length = fetch_file_size("src/shader/vert.spv");
 	char *vert_shader_code = read_file("src/shader/vert.spv", vert_shader_length);
 	size_t frag_shader_length = fetch_file_size("src/shader/frag.spv");
@@ -636,7 +636,7 @@ void allocate_command_buffers(VkSession *session){
 }
 
 
-void record_command_buffer(VkConfig *config, VkSession *session, uint32_t image_index){
+void record_command_buffer(VkSession *session, uint32_t image_index){
 	VkCommandBufferBeginInfo begin_info = {};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	begin_info.flags = 0;
@@ -744,8 +744,8 @@ void copy_buffer(VkSession *session, VkBuffer src, VkBuffer dst, VkDeviceSize si
 }
 
 
-void create_vertex_buffer(VkConfig *config, VkSession *session){
-	VkDeviceSize buffer_size = sizeof(Vertex) * config->vertex_count;
+void create_vertex_buffer(VkSession *session){
+	VkDeviceSize buffer_size = sizeof(Vertex) * session->vertex_count;
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -754,9 +754,8 @@ void create_vertex_buffer(VkConfig *config, VkSession *session){
 	void* data;
 	
 	vkMapMemory(session->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, config->vertices, (size_t) buffer_size);
+	memcpy(data, session->vertices, (size_t) buffer_size);
 	vkUnmapMemory(session->logical_device, staging_buffer_memory);
-
 	
 	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->vertex_buffer, &session->vertex_buffer_memory);
@@ -767,8 +766,8 @@ void create_vertex_buffer(VkConfig *config, VkSession *session){
 }
 
 
-void create_index_buffer(VkConfig *config, VkSession *session){
-	VkDeviceSize buffer_size = sizeof(uint16_t) * config->index_count;
+void create_index_buffer(VkSession *session){
+	VkDeviceSize buffer_size = sizeof(uint16_t) * session->index_count;
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -776,9 +775,8 @@ void create_index_buffer(VkConfig *config, VkSession *session){
 
 	void* data;
 	vkMapMemory(session->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, config->indices, (size_t) buffer_size);
+	memcpy(data, session->indices, (size_t) buffer_size);
 	vkUnmapMemory(session->logical_device, staging_buffer_memory);
-
 	
 	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->index_buffer, &session->index_buffer_memory);
 	copy_buffer(session, staging_buffer, session->index_buffer, buffer_size);
@@ -809,7 +807,7 @@ void create_sync_objects(VkSession *session){
 }
 
 
-void recreate_swapchain(VkConfig *config, VkSession *session){
+void recreate_swapchain(VkSession *session){
 	int width = 0;
 	int height = 0;
 	glfwGetFramebufferSize(session->window, &width, &height);
@@ -841,18 +839,18 @@ void recreate_swapchain(VkConfig *config, VkSession *session){
 }
 
 
-void vulkan_session_draw_frame(VkConfig *config, VkSession *session, bool resized){
+void vulkan_session_draw_frame(VkSession *session, bool resized){
 	vkWaitForFences(session->logical_device, 1, &session->in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
 	uint32_t image_index;
 	VkResult res = vkAcquireNextImageKHR(session->logical_device, session->swapchain, UINT64_MAX, session->image_available_semaphores[current_frame], VK_NULL_HANDLE, &image_index);	
 	if(res == VK_ERROR_OUT_OF_DATE_KHR){
-		recreate_swapchain(config, session);
+		recreate_swapchain(session);
 		return;
 	}
 	assert(res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR);
 	vkResetFences(session->logical_device, 1, &session->in_flight_fences[current_frame]);
 	vkResetCommandBuffer(session->command_buffers[current_frame], 0);
-	record_command_buffer(config, session, image_index);
+	record_command_buffer(session, image_index);
 	
 	VkSubmitInfo submit_info = {};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -884,7 +882,7 @@ void vulkan_session_draw_frame(VkConfig *config, VkSession *session, bool resize
 	res = vkQueuePresentKHR(session->present_queue, &present_info);
 	if(res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || resized){
 		resized = false;
-		recreate_swapchain(config, session);	
+		recreate_swapchain(session);	
 	}else if(res != VK_SUCCESS){
 		printf("Error\n");
 		exit(1);
@@ -897,6 +895,30 @@ void init_vertices(VkConfig *config, VkSession *session){
 	session->vertex_count = config->vertex_count;
 	session->indices = config->indices;
 	session->index_count = config->index_count;
+}
+
+void recreate_vertices(VkSession *session, Vertex *vertices, int vertex_count, uint16_t *indices, int index_count){
+	vkDeviceWaitIdle(session->logical_device);
+	session->vertices = malloc(sizeof(Vertex) * vertex_count);
+	for(int i = 0; i < vertex_count; i++){
+		session->vertices[i] = vertices[i];
+	}
+	session->vertex_count = vertex_count;
+
+	session->indices = malloc(sizeof(uint16_t) * index_count);
+	for(int i = 0; i < index_count; i++){
+		session->indices[i] = indices[i];
+	}
+	session->index_count = index_count;
+	
+
+	vkDestroyBuffer(session->logical_device, session->vertex_buffer, NULL);
+	vkFreeMemory(session->logical_device, session->vertex_buffer_memory, NULL);
+	vkDestroyBuffer(session->logical_device, session->index_buffer, NULL);
+	vkFreeMemory(session->logical_device, session->index_buffer_memory, NULL);
+
+	create_vertex_buffer(session);
+	create_index_buffer(session);
 }
 
 
@@ -919,8 +941,8 @@ void add_vertices(VkSession *session, Vertex *vertices, int vertex_count, uint16
 	vkDestroyBuffer(session->logical_device, session->index_buffer, NULL);
 	vkFreeMemory(session->logical_device, session->index_buffer_memory, NULL);
 
-	create_vertex_buffer(NULL, session);
-	create_index_buffer(NULL, session); // todo
+	create_vertex_buffer(session);
+	create_index_buffer(session); // todo
 }
 
 VkSession *vulkan_session_create(VkConfig *config){
@@ -937,11 +959,11 @@ VkSession *vulkan_session_create(VkConfig *config){
 	create_swapchain(session);
 	create_image_views(session);
 	create_render_pass(session);
-	create_graphics_pipeline(config, session);
+	create_graphics_pipeline(session);
 	create_framebuffers(session);
 	create_command_pool(session);
-	create_vertex_buffer(config, session);
-	create_index_buffer(config, session);
+	create_vertex_buffer(session);
+	create_index_buffer(session);
 	allocate_command_buffers(session);
 	create_sync_objects(session);
 	return session;

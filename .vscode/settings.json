@@ -2,6 +2,7 @@
     "files.associations": {
         "glfw3.h": "c",
         "aurora.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "aurora_tree.h": "c"
     }
 }

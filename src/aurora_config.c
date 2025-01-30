@@ -12,9 +12,6 @@ AuroraConfig *aurora_config_create(){
         .width = 800,
         .height = 600,
         .application_name = "Application name",
-		.vertices = NULL,
-		.vertex_count = 0,
-		.indices = NULL
     };
     return config;
 }
@@ -38,11 +35,4 @@ void aurora_config_enable_default_validation_layers(AuroraConfig *config){
 
 void aurora_config_set_application_name(AuroraConfig *config, char* name){
 	config->application_name = name;
-}
-
-void aurora_config_set_vertices(AuroraConfig *config, Vertex *vertices, int amount, uint16_t *indices, int index_count){
-	config->vertices = vertices;
-	config->vertex_count = amount;
-	config->indices = indices;
-	config->index_count = index_count;
 }

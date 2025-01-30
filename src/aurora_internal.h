@@ -11,6 +11,7 @@
 #include <assert.h>
 
 #include "aurora.h"
+#include "aurora_tree.h"
 
 struct AuroraConfig{
 	bool enable_validation_layers;
@@ -20,10 +21,6 @@ struct AuroraConfig{
 	char* application_name;
 	char** vertex_shader;
 	char** fragment_shader;
-	Vertex *vertices;
-	int vertex_count;
-	uint16_t *indices;
-	int index_count;
 };
 
 typedef struct {
@@ -77,6 +74,7 @@ typedef struct {
 struct AuroraSession{
     VkConfig *vk_config;
     VkSession *vk_session;
+	Tree *tree;
 };
 
 #endif
