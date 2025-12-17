@@ -16,18 +16,25 @@ struct Node {
     int width, height;
     Node *parent;
     Node **children;
-    int child_count;
+    size_t child_count;
+    size_t child_capacity;
 };
 
 typedef struct{
     Node *root;
-    int node_count;
+    size_t node_count;
     int width;
     int height;
+    Rotation rotation;
 } Tree;
+/**
+ * To add rotation of tree elements, we need to add glfw key callback (to select which area to traverse down to / rotate)
+ * Once key callback set, use rotation to correctly split areas into subdivisions
+ */
 
 extern Tree *create_tree(int width, int height);
 extern void split_node(Tree *tree, Node *current, int x, int y);
 extern void get_draw_data(Tree *tree, Vertex **vertices, size_t *vertex_count, uint16_t **indices, size_t *index_count);
+extern Node* find_at(Tree *tree, int x, int y);
 
-#endif
+#endif // AURORA_TREE_H

@@ -1,7 +1,7 @@
 #ifndef AURORA_INTERNAL_H
 #define AURORA_INTERNAL_H
 
-#include <GLFW/glfw3.h>
+#include <glfw3.h>
 #include <vulkan/vulkan.h>
 #include <stdbool.h>
 #include <stdio.h>

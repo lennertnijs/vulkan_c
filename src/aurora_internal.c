@@ -15,7 +15,7 @@ void mouse_click_callback(GLFWwindow *window, int button, int action, int mods){
 		double x, y;
 		glfwGetCursorPos(window, &x, &y);
         AuroraSession *session = (AuroraSession*)glfwGetWindowUserPointer(window);
-        split_node(session->tree, session->tree->root, (int)x, (int)y);
+        split_node(session->tree, find_at(session->tree, (int)x, (int)y), (int)x, (int)y);
         size_t vertex_count;
         size_t index_count;
         Vertex *vertices;
@@ -24,6 +24,8 @@ void mouse_click_callback(GLFWwindow *window, int button, int action, int mods){
         recreate_vertices(session->vk_session, vertices, vertex_count, indices, index_count);
 	}
 }
+
+
 
 void aurora_session_start(AuroraConfig *config){
     glfwInit();
@@ -50,7 +52,6 @@ void aurora_session_start(AuroraConfig *config){
     aurora->vk_config = &vkConfig;
     aurora->vk_session = session;
     aurora->tree = tree;
-    printf("Test succeeded\n");
 	glfwSetMouseButtonCallback(session->window, mouse_click_callback);
 	glfwSetWindowUserPointer(session->window, aurora);
 	glfwSetFramebufferSizeCallback(session->window, window_resize_callback);

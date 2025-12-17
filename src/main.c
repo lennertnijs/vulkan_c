@@ -1,12 +1,12 @@
 #include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include <glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <assert.h>
 #include "math.c"
-#include "vec.c"
+#include "vec.h"
 
 #define SUCCESS 1
 #define FAILURE 0

@@ -1,13 +1,14 @@
 #ifndef AURORA_H
 #define AURORA_H
 
-#include "vec.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include<cglm/cglm.h>
+#include <cglm/struct.h>
 
 typedef struct {
-	Vec2 position;
-	Vec3 color;
+	vec2s position;
+	vec3s color;
 } Vertex;
 
 typedef struct AuroraConfig AuroraConfig;

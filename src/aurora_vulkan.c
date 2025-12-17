@@ -1,5 +1,5 @@
 #include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include <glfw3.h>
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
@@ -8,7 +8,7 @@
 #include <math.h>
 
 #include "aurora_internal.h"
-#include "file.c"
+#include "io.h"
 
 const int validation_layer_count = 1;
 const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
@@ -57,14 +57,14 @@ void create_vk_instance(VkConfig *config, VkSession *session){
 		printf("Validation layers are not supported.\n");
 		abort();
 	}
-    VkApplicationInfo app_info = {};
+    VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = config->application_name;
 	app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	app_info.pEngineName = "Not an engine";
 	app_info.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 	
-    VkInstanceCreateInfo create_info = {};
+    VkInstanceCreateInfo create_info = {0};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pApplicationInfo = &app_info;
     create_info.enabledExtensionCount = config->glfw_extension_count;
@@ -86,7 +86,7 @@ void create_vk_instance(VkConfig *config, VkSession *session){
 bool has_graphics_queue(VkPhysicalDevice physical_device){
 	uint32_t count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, NULL);
-	VkQueueFamilyProperties *properties = malloc(sizeof(VkQueueFamilyProperties));
+	VkQueueFamilyProperties *properties = malloc(sizeof(VkQueueFamilyProperties) * count);
 	assert(properties != NULL);
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, properties);
 	
@@ -108,10 +108,10 @@ bool has_present_queue(VkPhysicalDevice physical_device, VkSurfaceKHR surface){
 	assert(properties != NULL);
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, properties);
 
-	VkBool32 supports_presenting;
+	VkBool32 supports_presenting = VK_FALSE;
 	for(uint32_t i = 0; i < count; i++){	
 		vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &supports_presenting);
-		if(supports_presenting){
+		if(supports_presenting == VK_TRUE){
 			break;
 		}
 	}
@@ -232,9 +232,9 @@ void create_logical_device(VkConfig *config, VkSession *session){
 		};
 	}
 	
-	VkPhysicalDeviceFeatures device_features = {};
+	VkPhysicalDeviceFeatures device_features = {0};
 
-	VkDeviceCreateInfo create_info = {};
+	VkDeviceCreateInfo create_info = {0};
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	create_info.pQueueCreateInfos = queue_infos;
 	create_info.queueCreateInfoCount = queue_count;
@@ -258,7 +258,7 @@ void create_logical_device(VkConfig *config, VkSession *session){
 
 void create_swapchain(VkSession *session)
 {
-	VkSurfaceCapabilitiesKHR capabilities= {};
+	VkSurfaceCapabilitiesKHR capabilities= {0};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(session->physical_device, session->surface, &capabilities);
 
 	session->image_count = capabilities.minImageCount + 1;
@@ -305,7 +305,7 @@ void create_swapchain(VkSession *session)
 		}
 	}
 	
-	VkSwapchainCreateInfoKHR create_info = {}; 
+	VkSwapchainCreateInfoKHR create_info = {0}; 
 	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	create_info.surface = session->surface;
 	create_info.minImageCount = session->image_count;
@@ -350,7 +350,7 @@ void create_swapchain(VkSession *session)
 void create_image_views(VkSession *session){
 	session->image_views = malloc(sizeof(VkImageView) * session->image_count);
 	for(uint32_t i = 0; i < session->image_count; i++){
-		VkImageViewCreateInfo create_info = {};
+		VkImageViewCreateInfo create_info = {0};
 		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		create_info.image = session->images[i];
 		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -373,7 +373,7 @@ void create_image_views(VkSession *session){
 
 
 void create_render_pass(VkSession *session){
-	VkAttachmentDescription color_attachment = {};
+	VkAttachmentDescription color_attachment = {0};
 	color_attachment.format = session->image_format.format;
 	color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -383,16 +383,16 @@ void create_render_pass(VkSession *session){
 	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	
-	VkAttachmentReference color_attachment_reference = {};
+	VkAttachmentReference color_attachment_reference = {0};
 	color_attachment_reference.attachment = 0; // fragment shader index location = 0
 	color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	
-	VkSubpassDescription subpass = {};
+	VkSubpassDescription subpass = {0};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_attachment_reference;
 
-	VkSubpassDependency dependency = {};
+	VkSubpassDependency dependency = {0};
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependency.dstSubpass = 0;
 	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -400,7 +400,7 @@ void create_render_pass(VkSession *session){
 	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-	VkRenderPassCreateInfo render_pass_create_info = {};
+	VkRenderPassCreateInfo render_pass_create_info = {0};
 	render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	render_pass_create_info.attachmentCount = 1;
 	render_pass_create_info.pAttachments = &color_attachment;
@@ -415,7 +415,7 @@ void create_render_pass(VkSession *session){
 }
 
 VkShaderModule create_shader_module(VkSession *session, char* code, size_t length){
-	VkShaderModuleCreateInfo create_info = {};
+	VkShaderModuleCreateInfo create_info = {0};
 	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	create_info.codeSize = length;
 	create_info.pCode = (uint32_t*)code; // align the char* to uint32_t (so, 4x the space from 1 byte to 4 bytes)
@@ -427,7 +427,7 @@ VkShaderModule create_shader_module(VkSession *session, char* code, size_t lengt
 }
 
 VkVertexInputBindingDescription get_binding_description(){
-	VkVertexInputBindingDescription description = {};
+	VkVertexInputBindingDescription description = {0};
 	description.binding = 0;
 	description.stride = sizeof(Vertex);
 	description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -456,20 +456,20 @@ VkVertexInputAttributeDescription* get_attribute_descriptions(){
 }
 
 void create_graphics_pipeline(VkSession *session){
-	size_t vert_shader_length = fetch_file_size("src/shader/vert.spv");
-	char *vert_shader_code = read_file("src/shader/vert.spv", vert_shader_length);
-	size_t frag_shader_length = fetch_file_size("src/shader/frag.spv");
-	char *frag_shader_code = read_file("src/shader/frag.spv", frag_shader_length);
+	size_t vert_shader_length = fetch_file_size("D:/vulkan-vs/shader/vert.spv");
+	char *vert_shader_code = read_file("D:/vulkan-vs/shader/vert.spv", vert_shader_length);
+	size_t frag_shader_length = fetch_file_size("D:/vulkan-vs/shader/frag.spv");
+	char *frag_shader_code = read_file("D:/vulkan-vs/shader/frag.spv", frag_shader_length);
 	VkShaderModule vertex_shader_module = create_shader_module(session, vert_shader_code, vert_shader_length);
 	VkShaderModule fragment_shader_module = create_shader_module(session, frag_shader_code, frag_shader_length);
 	
-	VkPipelineShaderStageCreateInfo vertex_shader_create_info = {};
+	VkPipelineShaderStageCreateInfo vertex_shader_create_info = {0};
 	vertex_shader_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertex_shader_create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	vertex_shader_create_info.module = vertex_shader_module;
 	vertex_shader_create_info.pName = "main";
 	
-	VkPipelineShaderStageCreateInfo fragment_shader_create_info = {};
+	VkPipelineShaderStageCreateInfo fragment_shader_create_info = {0};
 	fragment_shader_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	fragment_shader_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	fragment_shader_create_info.module = fragment_shader_module;
@@ -479,19 +479,19 @@ void create_graphics_pipeline(VkSession *session){
 	
 	VkVertexInputBindingDescription binding_description = get_binding_description();
 	VkVertexInputAttributeDescription* attribute_descriptions = get_attribute_descriptions();
-	VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
+	VkPipelineVertexInputStateCreateInfo vertex_input_info = {0};
 	vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertex_input_info.vertexBindingDescriptionCount = 1;
 	vertex_input_info.pVertexBindingDescriptions = &binding_description;
 	vertex_input_info.vertexAttributeDescriptionCount = 2;
 	vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions;
 	
-	VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info = {};
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info = {0};
 	input_assembly_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	input_assembly_create_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	input_assembly_create_info.primitiveRestartEnable = VK_FALSE;
 	
-	VkViewport viewport = {};
+	VkViewport viewport = {0};
 	viewport.x = 0;
 	viewport.y = 0;
 	viewport.width = (float) session->image_extent.width;
@@ -499,12 +499,12 @@ void create_graphics_pipeline(VkSession *session){
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
-	VkRect2D scissor = {};
+	VkRect2D scissor = {0};
 	VkOffset2D offset = {0, 0};
 	scissor.offset = offset;
 	scissor.extent = session->image_extent;
 	
-	VkPipelineViewportStateCreateInfo viewport_state_create_info = {};
+	VkPipelineViewportStateCreateInfo viewport_state_create_info = {0};
 
 	viewport_state_create_info.sType = 	VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewport_state_create_info.viewportCount = 1;	
@@ -512,7 +512,7 @@ void create_graphics_pipeline(VkSession *session){
 	viewport_state_create_info.scissorCount = 1;
 	viewport_state_create_info.pScissors = &scissor;
 
-	VkPipelineRasterizationStateCreateInfo rasterizer_create_info = {};
+	VkPipelineRasterizationStateCreateInfo rasterizer_create_info = {0};
 	rasterizer_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer_create_info.depthClampEnable = VK_FALSE;
 	rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
@@ -525,7 +525,7 @@ void create_graphics_pipeline(VkSession *session){
 	rasterizer_create_info.depthBiasClamp = 0.0f;
 	rasterizer_create_info.depthBiasSlopeFactor = 0.0f;
 
-	VkPipelineMultisampleStateCreateInfo multisample_create_info = {};
+	VkPipelineMultisampleStateCreateInfo multisample_create_info = {0};
 	multisample_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisample_create_info.sampleShadingEnable = VK_FALSE;
 	multisample_create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -534,7 +534,7 @@ void create_graphics_pipeline(VkSession *session){
 	multisample_create_info.alphaToCoverageEnable = VK_FALSE;
 	multisample_create_info.alphaToOneEnable = VK_FALSE;
 
-	VkPipelineColorBlendAttachmentState color_blend_attachment_create_info = {};
+	VkPipelineColorBlendAttachmentState color_blend_attachment_create_info = {0};
 	color_blend_attachment_create_info.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	color_blend_attachment_create_info.blendEnable = VK_FALSE;
 	color_blend_attachment_create_info.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -544,7 +544,7 @@ void create_graphics_pipeline(VkSession *session){
 	color_blend_attachment_create_info.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 	color_blend_attachment_create_info.alphaBlendOp = VK_BLEND_OP_ADD;
 
-	VkPipelineColorBlendStateCreateInfo color_blend_create_info = {};
+	VkPipelineColorBlendStateCreateInfo color_blend_create_info = {0};
 	color_blend_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	color_blend_create_info.logicOpEnable = VK_FALSE;
 	color_blend_create_info.logicOp = VK_LOGIC_OP_COPY;
@@ -556,13 +556,13 @@ void create_graphics_pipeline(VkSession *session){
 	color_blend_create_info.blendConstants[3] = 0.0f;
 
 	VkDynamicState states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-	VkPipelineDynamicStateCreateInfo dynamic_state_create_info = {};
+	VkPipelineDynamicStateCreateInfo dynamic_state_create_info = {0};
 	dynamic_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamic_state_create_info.dynamicStateCount = 2;
 	dynamic_state_create_info.pDynamicStates = &states[0];
 
 
-	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {0};
 	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_create_info.setLayoutCount = 0; 
 	pipeline_layout_create_info.pSetLayouts = NULL;
@@ -571,7 +571,7 @@ void create_graphics_pipeline(VkSession *session){
 	VkResult result = vkCreatePipelineLayout(session->logical_device, &pipeline_layout_create_info, NULL, &session->pipeline_layout);
 	assert(result == VK_SUCCESS);
 
-	VkGraphicsPipelineCreateInfo graphics_pipeline_create_info = {};
+	VkGraphicsPipelineCreateInfo graphics_pipeline_create_info = {0};
 	graphics_pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	graphics_pipeline_create_info.stageCount = 2;
 	graphics_pipeline_create_info.pStages = shader_stage_create_infos;
@@ -601,7 +601,7 @@ void create_framebuffers(VkSession *session){
 	session->frame_buffers = malloc(sizeof(VkFramebuffer) * session->image_count);
 	for(size_t i = 0; i < session->image_count; i++){
 		VkImageView image_view = session->image_views[i];
-		VkFramebufferCreateInfo frame_buffer_create_info = {};
+		VkFramebufferCreateInfo frame_buffer_create_info = {0};
 		frame_buffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frame_buffer_create_info.renderPass = session->render_pass;
 		frame_buffer_create_info.attachmentCount = 1;
@@ -616,7 +616,7 @@ void create_framebuffers(VkSession *session){
 
 
 void create_command_pool(VkSession *session){
-	VkCommandPoolCreateInfo command_pool_create_info = {};
+	VkCommandPoolCreateInfo command_pool_create_info = {0};
 	command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	command_pool_create_info.flags =  VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	command_pool_create_info.queueFamilyIndex = session->graphics_queue_index;
@@ -626,7 +626,7 @@ void create_command_pool(VkSession *session){
 
 void allocate_command_buffers(VkSession *session){
 	session->command_buffers = malloc(sizeof(VkCommandBuffer) * MAX_FRAMES_IN_FLIGHT);
-	VkCommandBufferAllocateInfo info = {};
+	VkCommandBufferAllocateInfo info = {0};
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	info.commandPool = session->command_pool;
 	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -637,13 +637,13 @@ void allocate_command_buffers(VkSession *session){
 
 
 void record_command_buffer(VkSession *session, uint32_t image_index){
-	VkCommandBufferBeginInfo begin_info = {};
+	VkCommandBufferBeginInfo begin_info = {0};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	begin_info.flags = 0;
 	begin_info.pInheritanceInfo = NULL;
 	VkResult result = vkBeginCommandBuffer(session->command_buffers[current_frame], &begin_info);
 	assert(result == VK_SUCCESS);
-	VkRenderPassBeginInfo render_pass_info = {};
+	VkRenderPassBeginInfo render_pass_info = {0};
 	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	render_pass_info.renderPass = session->render_pass;
 	render_pass_info.framebuffer = session->frame_buffers[image_index];
@@ -655,7 +655,7 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	vkCmdBeginRenderPass(session->command_buffers[current_frame], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindPipeline(session->command_buffers[current_frame], VK_PIPELINE_BIND_POINT_GRAPHICS, session->graphics_pipeline);
 	
-	VkViewport viewport = {};
+	VkViewport viewport = {0};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
 	viewport.width = session->image_extent.width; // todo
@@ -663,7 +663,7 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(session->command_buffers[current_frame], 0, 1, &viewport);
-	VkRect2D scissor = {};
+	VkRect2D scissor = {0};
 	scissor.offset = (VkOffset2D){0, 0};
 	scissor.extent = session->image_extent;
 	vkCmdSetScissor(session->command_buffers[current_frame], 0, 1, &scissor);
@@ -691,9 +691,39 @@ uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 	assert(0 == 1);
 }
 
-void create_buffer(VkSession *session, VkDeviceSize size, VkBufferUsageFlags usage, 
-				   VkMemoryPropertyFlags properties, VkBuffer* buffer, VkDeviceMemory* buffer_memory){
-	VkBufferCreateInfo info = {};
+static bool create_buffer2(VkSession* session,
+	VkDeviceSize size,
+	VkBufferUsageFlags usageFlags,
+	VkBuffer* buffer)
+{
+	VkBufferCreateInfo info = { 0 };
+	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	info.size = size;
+	info.usage = usageFlags;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	return vkCreateBuffer(session->logical_device, &info, NULL, buffer) != VK_SUCCESS;
+}
+
+static bool allocate_memory(VkSession* session,
+	VkMemoryRequirements requirements,
+	VkMemoryPropertyFlags propertyFlags,
+	VkDeviceMemory* memory)
+{
+	VkMemoryAllocateInfo info = { 0 };
+	info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	info.allocationSize = requirements.size;
+	info.memoryTypeIndex = find_memory_type(session->physical_device, requirements.memoryTypeBits, propertyFlags);
+	return vkAllocateMemory(session->logical_device, &info, NULL, memory) != VK_SUCCESS;
+}
+
+void create_buffer( VkSession *session, 
+					VkDeviceSize size, 
+					VkBufferUsageFlags usage, 
+					VkMemoryPropertyFlags properties, 
+					VkBuffer* buffer, 
+					VkDeviceMemory* buffer_memory)
+{
+	VkBufferCreateInfo info = {0};
 	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	info.size = size;
 	info.usage = usage;
@@ -703,7 +733,7 @@ void create_buffer(VkSession *session, VkDeviceSize size, VkBufferUsageFlags usa
 	VkMemoryRequirements requirements;
 	vkGetBufferMemoryRequirements(session->logical_device, *buffer, &requirements);
 	
-	VkMemoryAllocateInfo alloc_info = {};
+	VkMemoryAllocateInfo alloc_info = {0};
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = requirements.size;	
 	alloc_info.memoryTypeIndex = find_memory_type(session->physical_device, requirements.memoryTypeBits, properties);
@@ -713,7 +743,7 @@ void create_buffer(VkSession *session, VkDeviceSize size, VkBufferUsageFlags usa
 }
 
 void copy_buffer(VkSession *session, VkBuffer src, VkBuffer dst, VkDeviceSize size){
-	VkCommandBufferAllocateInfo info = {};
+	VkCommandBufferAllocateInfo info = {0};
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	info.commandPool = session->command_pool;
@@ -722,19 +752,19 @@ void copy_buffer(VkSession *session, VkBuffer src, VkBuffer dst, VkDeviceSize si
 	VkCommandBuffer command_buffer;
 	vkAllocateCommandBuffers(session->logical_device, &info, &command_buffer);
 
-	VkCommandBufferBeginInfo begin_info = {};
+	VkCommandBufferBeginInfo begin_info = {0};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	vkBeginCommandBuffer(command_buffer, &begin_info);
 	
-	VkBufferCopy copy = {};
+	VkBufferCopy copy = {0};
 	copy.srcOffset = 0;
 	copy.dstOffset = 0;
 	copy.size = size;
 	vkCmdCopyBuffer(command_buffer, src, dst, 1, &copy);
 	vkEndCommandBuffer(command_buffer);
 	
-	VkSubmitInfo submit_info = {};
+	VkSubmitInfo submit_info = {0};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &command_buffer;
@@ -748,17 +778,20 @@ void create_vertex_buffer(VkSession *session){
 	VkDeviceSize buffer_size = sizeof(Vertex) * session->vertex_count;
 
 	VkBuffer staging_buffer;
+	create_buffer2(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &staging_buffer);
+	VkMemoryRequirements requirements;
+	vkGetBufferMemoryRequirements(session->logical_device, staging_buffer, &requirements);
 	VkDeviceMemory staging_buffer_memory;
-	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
+	allocate_memory(session, requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer_memory);
+	vkBindBufferMemory(session->logical_device, staging_buffer, staging_buffer_memory, 0);
+
 	void* data;
-	
 	vkMapMemory(session->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
 	memcpy(data, session->vertices, (size_t) buffer_size);
 	vkUnmapMemory(session->logical_device, staging_buffer_memory);
 	
 	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->vertex_buffer, &session->vertex_buffer_memory);
+	  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->vertex_buffer, &session->vertex_buffer_memory);
 	copy_buffer(session, staging_buffer, session->vertex_buffer, buffer_size);
 
 	vkDestroyBuffer(session->logical_device, staging_buffer, NULL);
@@ -789,10 +822,10 @@ void create_sync_objects(VkSession *session){
 	session->image_available_semaphores = malloc(sizeof(VkSemaphore) * MAX_FRAMES_IN_FLIGHT);
 	session->render_finished_semaphores = malloc(sizeof(VkSemaphore) * MAX_FRAMES_IN_FLIGHT);
 	session->in_flight_fences = malloc(sizeof(VkFence) * MAX_FRAMES_IN_FLIGHT);
-	VkSemaphoreCreateInfo semaphore_info  = {};
+	VkSemaphoreCreateInfo semaphore_info  = {0};
 	semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	
-	VkFenceCreateInfo fence_info = {};
+	VkFenceCreateInfo fence_info = {0};
 	fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
@@ -852,7 +885,7 @@ void vulkan_session_draw_frame(VkSession *session, bool resized){
 	vkResetCommandBuffer(session->command_buffers[current_frame], 0);
 	record_command_buffer(session, image_index);
 	
-	VkSubmitInfo submit_info = {};
+	VkSubmitInfo submit_info = {0};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	
 	VkSemaphore wait_semaphores[] = {session->image_available_semaphores[current_frame]};
@@ -869,7 +902,7 @@ void vulkan_session_draw_frame(VkSession *session, bool resized){
 	VkResult result = vkQueueSubmit(session->graphics_queue, 1, &submit_info,session->in_flight_fences[current_frame]);
 	assert(result == VK_SUCCESS);	
 	
-	VkPresentInfoKHR present_info = {};
+	VkPresentInfoKHR present_info = {0};
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	present_info.waitSemaphoreCount = 1;
 	present_info.pWaitSemaphores = &signal_semaphores[0];

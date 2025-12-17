@@ -3,6 +3,9 @@
         "glfw3.h": "c",
         "aurora.h": "c",
         "stdint.h": "c",
-        "aurora_tree.h": "c"
+        "aurora_tree.h": "c",
+        "stdbool.h": "c",
+        "io.h": "c",
+        "aurora_internal.h": "c"
     }
 }
