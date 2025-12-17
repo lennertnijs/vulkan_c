@@ -3,3 +3,7 @@ GLFW/
 
 # Ignore vulkan directory
 vulkan/
+
+# ignore vs
+.vs/
+.vscode/
