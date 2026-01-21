@@ -1,5 +1,7 @@
 #include <vulkan/vulkan.h>
 #include <glfw3.h>
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
@@ -17,6 +19,12 @@ const int extension_count = 1;
 const char* extensions[] = {"VK_KHR_swapchain"};
 const int MAX_FRAMES_IN_FLIGHT = 2;
 uint32_t current_frame = 0;
+
+typedef struct {
+	mat4 model;
+	mat4 view;
+	mat4 proj;
+} UniformBufferObject;
 
 void create_window(VkSession* session) {
 	assert(session != NULL);
@@ -70,13 +78,13 @@ void create_vk_instance(VkConfig *config, VkSession *session){
     create_info.pApplicationInfo = &app_info;
     create_info.enabledExtensionCount = config->glfw_extension_count;
     create_info.ppEnabledExtensionNames = config->glfw_extensions;
-	if(config->enable_validation_layers){
+	//if(config->enable_validation_layers){
 		create_info.enabledLayerCount = validation_layer_count;
 		create_info.ppEnabledLayerNames = validation_layers;
-	}else{
-		create_info.enabledLayerCount = 0;
-		create_info.ppEnabledLayerNames = NULL;
-	}
+	//}else{
+	//	create_info.enabledLayerCount = 0;
+	//	create_info.ppEnabledLayerNames = NULL;
+	//}
 
 	if(vkCreateInstance(&create_info, NULL, &session->instance) != VK_SUCCESS){
 		printf("VkInstance creation failed.\n");
@@ -457,10 +465,10 @@ VkVertexInputAttributeDescription* get_attribute_descriptions(){
 }
 
 void create_graphics_pipeline(VkSession *session){
-	size_t vert_shader_length = fetch_file_size("D:/vulkan-vs/shader/vert.spv");
-	char *vert_shader_code = read_file("D:/vulkan-vs/shader/vert.spv", vert_shader_length);
-	size_t frag_shader_length = fetch_file_size("D:/vulkan-vs/shader/frag.spv");
-	char *frag_shader_code = read_file("D:/vulkan-vs/shader/frag.spv", frag_shader_length);
+	size_t vert_shader_length = fetch_file_size("D:/vulkan_c/src/shader/vert.spv");
+	char *vert_shader_code = read_file("D:/vulkan_c/src/shader/vert.spv", vert_shader_length);
+	size_t frag_shader_length = fetch_file_size("D:/vulkan_c/src/shader/frag.spv");
+	char *frag_shader_code = read_file("D:/vulkan_c/src/shader/frag.spv", frag_shader_length);
 	VkShaderModule vertex_shader_module = create_shader_module(session, vert_shader_code, vert_shader_length);
 	VkShaderModule fragment_shader_module = create_shader_module(session, frag_shader_code, frag_shader_length);
 	
@@ -520,7 +528,7 @@ void create_graphics_pipeline(VkSession *session){
 	rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer_create_info.lineWidth = 1.0f;
 	rasterizer_create_info.cullMode = VK_CULL_MODE_NONE;
-	rasterizer_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer_create_info.depthBiasEnable = VK_FALSE;
 	rasterizer_create_info.depthBiasConstantFactor = 0.0f;
 	rasterizer_create_info.depthBiasClamp = 0.0f;
@@ -565,8 +573,8 @@ void create_graphics_pipeline(VkSession *session){
 
 	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {0};
 	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipeline_layout_create_info.setLayoutCount = 0; 
-	pipeline_layout_create_info.pSetLayouts = NULL;
+	pipeline_layout_create_info.setLayoutCount = 1; 
+	pipeline_layout_create_info.pSetLayouts = &session->descriptor_set_layout;
 	pipeline_layout_create_info.pushConstantRangeCount = 0;
 	pipeline_layout_create_info.pPushConstantRanges = NULL;
 	VkResult result = vkCreatePipelineLayout(session->logical_device, &pipeline_layout_create_info, NULL, &session->pipeline_layout);
@@ -673,6 +681,7 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	VkDeviceSize offsets[] = {0};
 	vkCmdBindVertexBuffers(session->command_buffers[current_frame], 0, 1, vertex_buffers, offsets);
 	vkCmdBindIndexBuffer(session->command_buffers[current_frame], session->index_buffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindDescriptorSets(session->command_buffers[current_frame], VK_PIPELINE_BIND_POINT_GRAPHICS, session->pipeline_layout, 0, 1, &session->descriptor_sets[current_frame], 0, 0);
 	vkCmdDrawIndexed(session->command_buffers[current_frame], session->index_count, 1, 0, 0, 0);
 	
 	vkCmdEndRenderPass(session->command_buffers[current_frame]);
@@ -872,6 +881,28 @@ void recreate_swapchain(VkSession *session){
 	create_framebuffers(session);	
 }
 
+float elapsed = 0.01f;
+
+void update_uniform_buffer(VkSession* session, uint32_t current_image) {
+	if (elapsed > 360.0f) elapsed -= 360.0f;
+	UniformBufferObject ubo = { 0 };
+	glm_mat4_identity(ubo.model);
+	glm_rotate(&ubo.model, elapsed * glm_rad(90.0f), (vec3) { 0.0f, 0.0f, 1.0f });
+
+	glm_lookat(
+		(vec3) { 2.0f, 2.0f, 2.0f },
+		(vec3) { 0.0f, 0.0f, 0.0f },
+		(vec3) { 0.0f, 0.0f, 1.0f },
+		&ubo.view
+	);
+
+	glm_perspective(glm_rad(45.0f),	session->image_extent.width / (float)session->image_extent.height, 0.1f, 10.0f,	&ubo.proj);
+
+	ubo.proj[1][1] *= -1;
+	elapsed += 0.01f;
+	memcpy(session->uniform_buffers_mapped[current_image], &ubo, sizeof(ubo));
+}
+
 
 void vulkan_session_draw_frame(VkSession *session, bool resized){
 	vkWaitForFences(session->logical_device, 1, &session->in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
@@ -885,7 +916,8 @@ void vulkan_session_draw_frame(VkSession *session, bool resized){
 	vkResetFences(session->logical_device, 1, &session->in_flight_fences[current_frame]);
 	vkResetCommandBuffer(session->command_buffers[current_frame], 0);
 	record_command_buffer(session, image_index);
-	
+	update_uniform_buffer(session, current_frame);
+
 	VkSubmitInfo submit_info = {0};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	
@@ -979,6 +1011,93 @@ void add_vertices(VkSession *session, Vertex *vertices, int vertex_count, uint16
 	create_index_buffer(session); // todo
 }
 
+void createDescriptorSetLayout(VkSession* session) {
+	VkDescriptorSetLayoutBinding uboLayoutBinding = {
+		.binding = 0,
+		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.descriptorCount = 1,
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.pImmutableSamplers = 0
+	};
+	VkDescriptorSetLayoutCreateInfo layout_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = 1,
+		.pBindings = &uboLayoutBinding
+	};
+	if (vkCreateDescriptorSetLayout(session->logical_device, &layout_info, 0, &session->descriptor_set_layout) != VK_SUCCESS) {
+		printf("Failed to create descriptor set!");
+		exit(1);
+	}
+}
+
+void create_uniform_buffers(VkSession* session) {
+	VkDeviceSize buffer_size = sizeof(UniformBufferObject);
+	session->uniform_buffers = malloc(sizeof(VkBuffer) * MAX_FRAMES_IN_FLIGHT);
+	session->uniform_buffers_memory = malloc(sizeof(VkDeviceMemory) * MAX_FRAMES_IN_FLIGHT);
+	session->uniform_buffers_mapped = malloc(sizeof(void*) * MAX_FRAMES_IN_FLIGHT);
+	session->ubo_count = MAX_FRAMES_IN_FLIGHT;
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		create_buffer(session, buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &session->uniform_buffers[i], &session->uniform_buffers_memory[i]);
+		vkMapMemory(session->logical_device, session->uniform_buffers_memory[i], 0, buffer_size, 0, &session->uniform_buffers_mapped[i]);
+	}
+}
+
+void create_descriptor_pool(VkSession* session) {
+	VkDescriptorPoolSize pool_size = {
+		.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.descriptorCount = (uint32_t)MAX_FRAMES_IN_FLIGHT
+	};
+	VkDescriptorPoolCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.poolSizeCount = 1,
+		.pPoolSizes = &pool_size,
+		.maxSets = (uint32_t)MAX_FRAMES_IN_FLIGHT,
+		.flags = 0
+	};
+	if (vkCreateDescriptorPool(session->logical_device, &create_info, 0, &session->descriptor_pool) != VK_SUCCESS) {
+		printf("Descriptor pool set creation failed!\n");
+		exit(1);
+	}
+}
+
+void create_descriptor_sets(VkSession* session) {
+	VkDescriptorSetLayout* layouts = malloc(sizeof(VkDescriptorSetLayout) * MAX_FRAMES_IN_FLIGHT);
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		layouts[i] = session->descriptor_set_layout;
+	}
+	VkDescriptorSetAllocateInfo alloc_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.descriptorPool = session->descriptor_pool,
+		.descriptorSetCount = (uint32_t)MAX_FRAMES_IN_FLIGHT,
+		.pSetLayouts = layouts
+	};
+	session->descriptor_sets = malloc(sizeof(VkDescriptorSet) * MAX_FRAMES_IN_FLIGHT);
+	if (vkAllocateDescriptorSets(session->logical_device, &alloc_info, session->descriptor_sets) != VK_SUCCESS) {
+		printf("Failed to alloc descriptor sets\n");
+		exit(1);
+	}
+
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		VkDescriptorBufferInfo buffer_info = {
+			.buffer = session->uniform_buffers[i],
+			.offset = 0,
+			.range = sizeof(UniformBufferObject)
+		};
+		VkWriteDescriptorSet write = {
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = session->descriptor_sets[i],
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.pBufferInfo = &buffer_info,
+			.pImageInfo = 0,
+			.pTexelBufferView = 0
+		};
+		vkUpdateDescriptorSets(session->logical_device, 1, &write, 0, 0);
+	}
+}
+
 VkSession *vulkan_session_create(VkConfig *config){
 	if(config == NULL){
 		printf("Vulkan config is NULL.");
@@ -993,11 +1112,15 @@ VkSession *vulkan_session_create(VkConfig *config){
 	create_swapchain(session);
 	create_image_views(session);
 	create_render_pass(session);
+	createDescriptorSetLayout(session);
 	create_graphics_pipeline(session);
 	create_framebuffers(session);
 	create_command_pool(session);
 	create_vertex_buffer(session);
 	create_index_buffer(session);
+	create_uniform_buffers(session);
+	create_descriptor_pool(session);
+	create_descriptor_sets(session);
 	allocate_command_buffers(session);
 	create_sync_objects(session);
 	return session;
@@ -1034,6 +1157,12 @@ void vulkan_session_destroy(VkSession *session){
 	free(session->image_views);
 	free(session->images);
 	vkDestroySwapchainKHR(session->logical_device, session->swapchain, NULL);
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		vkDestroyBuffer(session->logical_device, session->uniform_buffers[i], 0);
+		vkFreeMemory(session->logical_device, session->uniform_buffers_memory[i], 0);
+	}
+	vkDestroyDescriptorPool(session->logical_device, session->descriptor_pool, 0);
+	vkDestroyDescriptorSetLayout(session->logical_device, session->descriptor_set_layout, 0);
 	vkDestroyBuffer(session->logical_device, session->vertex_buffer, NULL);
 	vkFreeMemory(session->logical_device, session->vertex_buffer_memory, NULL);
 	vkDestroyBuffer(session->logical_device, session->index_buffer, NULL);

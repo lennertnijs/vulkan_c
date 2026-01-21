@@ -69,6 +69,13 @@ typedef struct {
 	int vertex_count;
 	uint16_t *indices;
 	int index_count;
+	VkDescriptorSetLayout descriptor_set_layout;
+	VkBuffer* uniform_buffers;
+	VkDeviceMemory* uniform_buffers_memory;
+	void** uniform_buffers_mapped;
+	int ubo_count;
+	VkDescriptorPool descriptor_pool;
+	VkDescriptorSet* descriptor_sets;
 } VkSession;
 
 struct AuroraSession{
