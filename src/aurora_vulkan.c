@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <cglm/cglm.h>
 
 #include "aurora_internal.h"
 #include "io.h"
