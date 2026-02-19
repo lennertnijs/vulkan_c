@@ -7,7 +7,7 @@
 #include <cglm/struct.h>
 
 typedef struct {
-	vec2s position;
+	vec3s position;
 	vec3s color;
 	vec2s text_coord;
 } Vertex;

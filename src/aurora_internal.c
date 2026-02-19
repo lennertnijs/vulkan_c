@@ -36,28 +36,44 @@ void aurora_session_start(AuroraConfig *config){
     size_t index_count;
     Vertex *vertices;
     uint16_t *indices;
-    vertex_count = 4;
-    index_count = 6;
+    vertex_count = 8;
+    index_count = 12;
 
     vertices = malloc(sizeof(Vertex) * vertex_count);
     indices = malloc(sizeof(uint16_t) * index_count);
 
     // Define rectangle vertices (positions in XY plane)
-    vertices[0].position = (vec2s){ -0.5f, -0.5f };
+    vertices[0].position = (vec3s){ -0.5f, -0.5f, 0.0f };
     vertices[0].color = (vec3s){ 1.0f, 0.0f, 0.0f }; // Red - bottom left
     vertices[0].text_coord = (vec2s){ 1.0f, 0.0f };
 
-    vertices[1].position = (vec2s){ 0.5f, -0.5f };
+    vertices[1].position = (vec3s){ 0.5f, -0.5f, 0.0f };
     vertices[1].color = (vec3s){ 0.0f, 1.0f, 0.0f }; // Green - bottom right
     vertices[1].text_coord = (vec2s){ 0.0f, 0.0f };
 
-    vertices[2].position = (vec2s){ 0.5f, 0.5f };
+    vertices[2].position = (vec3s){ 0.5f, 0.5f, 0.0f };
     vertices[2].color = (vec3s){ 0.0f, 0.0f, 1.0f }; // Blue - top right
     vertices[2].text_coord = (vec2s){ 0.0f, 1.0f };
 
-    vertices[3].position = (vec2s){ -0.5f, 0.5f };
+    vertices[3].position = (vec3s){ -0.5f, 0.5f, 0.0f };
     vertices[3].color = (vec3s){ 1.0f, 1.0f, 0.0f }; // Yellow - top left
     vertices[3].text_coord = (vec2s){ 1.0f, 1.0f };
+
+    vertices[4].position = (vec3s){ -0.5f, -0.5f, -0.5f };
+    vertices[4].color = (vec3s){ 1.0f, 0.0f, 0.0f }; // Red - bottom left
+    vertices[4].text_coord = (vec2s){ 1.0f, 0.0f };
+
+    vertices[5].position = (vec3s){ 0.5f, -0.5f, -0.5f };
+    vertices[5].color = (vec3s){ 0.0f, 1.0f, 0.0f }; // Green - bottom right
+    vertices[5].text_coord = (vec2s){ 0.0f, 0.0f };
+
+    vertices[6].position = (vec3s){ 0.5f, 0.5f, -0.5f };
+    vertices[6].color = (vec3s){ 0.0f, 0.0f, 1.0f }; // Blue - top right
+    vertices[6].text_coord = (vec2s){ 0.0f, 1.0f };
+
+    vertices[7].position = (vec3s){ -0.5f, 0.5f, -0.5f };
+    vertices[7].color = (vec3s){ 1.0f, 1.0f, 0.0f }; // Yellow - top left
+    vertices[7].text_coord = (vec2s){ 1.0f, 1.0f };
 
     // Define indices for two triangles composing the rectangle
     indices[0] = 0; // first triangle
@@ -67,6 +83,14 @@ void aurora_session_start(AuroraConfig *config){
     indices[3] = 2; // second triangle
     indices[4] = 3;
     indices[5] = 0;
+
+    indices[6] = 4;
+    indices[7] = 5;
+    indices[8] = 6;
+
+    indices[9] = 6;
+    indices[10] = 7;
+    indices[11] = 4;
     //get_draw_data(tree, &vertices, &vertex_count, &indices, &index_count);
 	VkConfig vkConfig = {
         .enable_validation_layers = true,

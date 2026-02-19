@@ -80,6 +80,9 @@ typedef struct {
 	VkDeviceMemory texture_image_memory;
 	VkImageView texture_image_view;
 	VkSampler sampler;
+	VkImage depth_image;
+	VkDeviceMemory depth_image_memory;
+	VkImageView depth_image_view;
 } VkSession;
 
 struct AuroraSession{

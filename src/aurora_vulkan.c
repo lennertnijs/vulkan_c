@@ -1,6 +1,7 @@
 #include <vulkan/vulkan.h>
 #include <glfw3.h>
 #define STB_IMAGE_IMPLEMENTATION
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
@@ -430,28 +431,46 @@ void create_render_pass(VkSession *session){
 	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	
+
 	VkAttachmentReference color_attachment_reference = {0};
 	color_attachment_reference.attachment = 0; // fragment shader index location = 0
 	color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	
+	VkAttachmentDescription depth_attachment = {
+	.format = find_depth_format(session),
+	.samples = VK_SAMPLE_COUNT_1_BIT,
+	.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+	.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+	.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+	.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	};
+
+	VkAttachmentReference depth_attachment_reference = {
+		.attachment = 1,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	};
+
 	VkSubpassDescription subpass = {0};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_attachment_reference;
+	subpass.pDepthStencilAttachment = &depth_attachment_reference;
 
 	VkSubpassDependency dependency = {0};
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	dependency.srcAccessMask = 0;	
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT; 
 
+	VkAttachmentDescription attachment_descriptions[2] = { color_attachment, depth_attachment };
 	VkRenderPassCreateInfo render_pass_create_info = {0};
 	render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	render_pass_create_info.attachmentCount = 1;
-	render_pass_create_info.pAttachments = &color_attachment;
+	render_pass_create_info.attachmentCount = 2;
+	render_pass_create_info.pAttachments = &attachment_descriptions;
 	render_pass_create_info.subpassCount = 1;
 	render_pass_create_info.pSubpasses = &subpass;
 	render_pass_create_info.dependencyCount = 1;
@@ -487,7 +506,7 @@ VkVertexInputAttributeDescription* get_attribute_descriptions(){
 	VkVertexInputAttributeDescription description1 = {
 		.location = 0,
 		.binding = 0,
-		.format = VK_FORMAT_R32G32_SFLOAT,
+		.format = VK_FORMAT_R32G32B32_SFLOAT,
 		.offset = offsetof(Vertex, position)
 	};
 
@@ -632,6 +651,19 @@ void create_graphics_pipeline(VkSession *session){
 	VkResult result = vkCreatePipelineLayout(session->logical_device, &pipeline_layout_create_info, NULL, &session->pipeline_layout);
 	assert(result == VK_SUCCESS);
 
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_create_info = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_TRUE,
+		.depthWriteEnable = VK_TRUE,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
+		.depthBoundsTestEnable = VK_FALSE,
+		.minDepthBounds = 0.0f,
+		.maxDepthBounds = 1.0f,
+		.stencilTestEnable = VK_FALSE,
+		.front = {0},
+		.back = {0}
+	};
+
 	VkGraphicsPipelineCreateInfo graphics_pipeline_create_info = {0};
 	graphics_pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	graphics_pipeline_create_info.stageCount = 2;
@@ -641,7 +673,7 @@ void create_graphics_pipeline(VkSession *session){
 	graphics_pipeline_create_info.pViewportState = &viewport_state_create_info;
 	graphics_pipeline_create_info.pRasterizationState = &rasterizer_create_info;
 	graphics_pipeline_create_info.pMultisampleState = &multisample_create_info;
-	graphics_pipeline_create_info.pDepthStencilState = NULL;
+	graphics_pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
 	graphics_pipeline_create_info.pColorBlendState = &color_blend_create_info;
 	graphics_pipeline_create_info.pDynamicState = &dynamic_state_create_info;
 	graphics_pipeline_create_info.layout = session->pipeline_layout;
@@ -660,18 +692,23 @@ void create_graphics_pipeline(VkSession *session){
 
 void create_framebuffers(VkSession *session){
 	session->frame_buffers = malloc(sizeof(VkFramebuffer) * session->image_count);
+	if (session->frame_buffers == 0) {
+		exit(1);
+	}
 	for(size_t i = 0; i < session->image_count; i++){
-		VkImageView image_view = session->image_views[i];
+		VkImageView views[2] = { session->image_views[i], session->depth_image_view };
 		VkFramebufferCreateInfo frame_buffer_create_info = {0};
 		frame_buffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frame_buffer_create_info.renderPass = session->render_pass;
-		frame_buffer_create_info.attachmentCount = 1;
-		frame_buffer_create_info.pAttachments = &image_view;
+		frame_buffer_create_info.attachmentCount = 2;
+		frame_buffer_create_info.pAttachments = views;
 		frame_buffer_create_info.width = session->image_extent.width;
 		frame_buffer_create_info.height = session->image_extent.height;
 		frame_buffer_create_info.layers = 1;
-		VkResult result = vkCreateFramebuffer(session->logical_device, &frame_buffer_create_info, NULL, &session->frame_buffers[i]);
-		assert(result == VK_SUCCESS);
+		if (vkCreateFramebuffer(session->logical_device, &frame_buffer_create_info, NULL, &session->frame_buffers[i]) != VK_SUCCESS) {
+			printf("Failed to create a frame buffer!");
+			exit(1);
+		}
 	}
 }
 
@@ -710,9 +747,11 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	render_pass_info.framebuffer = session->frame_buffers[image_index];
 	render_pass_info.renderArea.offset = (VkOffset2D){0, 0};
 	render_pass_info.renderArea.extent = session->image_extent;
-	VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-	render_pass_info.clearValueCount = 1;
-	render_pass_info.pClearValues = &clear_color;
+	VkClearValue clear_color = { 0.0f, 0.0f, 0.0f, 1.0f };
+	VkClearValue clear_depth_stencil = { 1.0f, 0 };
+	VkClearValue clear_values[2] = { clear_color, clear_depth_stencil };
+	render_pass_info.clearValueCount = 2;
+	render_pass_info.pClearValues = clear_values;
 	vkCmdBeginRenderPass(session->command_buffers[current_frame], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindPipeline(session->command_buffers[current_frame], VK_PIPELINE_BIND_POINT_GRAPHICS, session->graphics_pipeline);
 	
@@ -882,11 +921,16 @@ void create_sync_objects(VkSession *session){
 	}
 }
 
+void cleanup_swapchain(VkSession* session) {
+	vkDestroyImageView(session->logical_device, session->depth_image_view, 0);
+	vkDestroyImage(session->logical_device, session->depth_image, 0);
+	vkFreeMemory(session->logical_device, session->depth_image_memory, 0);
+}
+
 
 void recreate_swapchain(VkSession *session){
 	int width = 0;
 	int height = 0;
-	glfwGetFramebufferSize(session->window, &width, &height);
 	while(width == 0 && height == 0){
 		glfwGetFramebufferSize(session->window, &width, &height);
 		glfwWaitEvents();
@@ -908,7 +952,7 @@ void recreate_swapchain(VkSession *session){
 	if(session->swapchain != NULL){
 		vkDestroySwapchainKHR(session->logical_device, session->swapchain, NULL);
 	}
-
+	cleanup_swapchain(session);
 	create_swapchain(session);
 	create_image_views(session);
 	create_framebuffers(session);	
@@ -1215,8 +1259,23 @@ void create_image(VkSession* session, uint32_t width, uint32_t height, VkFormat 
 	vkBindImageMemory(session->logical_device, *image, *image_memory, 0);
 }
 
+bool has_stencil_component(VkFormat format) {
+	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
 void transition_image_layout(VkSession* session, VkImage image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout) {
 	VkCommandBuffer command_buffer = begin_single_time_commands(session);
+
+	VkImageAspectFlags flags;
+	if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+		flags = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if (has_stencil_component(format)) {
+			flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+	}
+	else {
+		flags = VK_IMAGE_ASPECT_COLOR_BIT;
+	}
 
 	VkImageMemoryBarrier barrier = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1225,7 +1284,7 @@ void transition_image_layout(VkSession* session, VkImage image, VkFormat format,
 		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.image = image,
-		.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.aspectMask = flags,
 		.subresourceRange.baseMipLevel = 0,
 		.subresourceRange.levelCount = 1,
 		.subresourceRange.baseArrayLayer = 0,
@@ -1248,6 +1307,12 @@ void transition_image_layout(VkSession* session, VkImage image, VkFormat format,
 
 		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	}
 	else {
 		printf("Invalid pipelines brev!");
@@ -1357,6 +1422,50 @@ void create_texture_sampler(VkSession* session) {
 	}
 }
 
+VkFormat find_supported_format(VkSession *session, VkFormat* candidates, int amount, VkImageTiling tiling, VkFormatFeatureFlags features) {
+	for (int i = 0; i < amount; i++) {
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties(session->physical_device, candidates[i], &props);
+		if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+			return candidates[i];
+		}
+		else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+			return candidates[i];
+		}
+	}
+	printf("No supported formats found!");
+	exit(1);
+}
+
+VkFormat find_depth_format(VkSession* session) {
+	VkFormat candidates[3] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
+	return find_supported_format(session, candidates, 3, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
+void create_depth_resources(VkSession* session) {
+	VkFormat format = find_depth_format(session);
+	create_image(session, session->image_extent.width, session->image_extent.height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->depth_image, &session->depth_image_memory);
+	VkImageViewCreateInfo create_info = {
+	.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+	.image = session->depth_image,
+	.viewType = VK_IMAGE_VIEW_TYPE_2D,
+	.format = format,
+	.subresourceRange = (VkImageSubresourceRange){
+		.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+		.baseMipLevel = 0,
+		.levelCount = 1,
+		.baseArrayLayer = 0,
+		.layerCount = 1
+	}
+	};
+	if (vkCreateImageView(session->logical_device, &create_info, 0, &session->depth_image_view) != VK_SUCCESS) {
+		printf("Something went wrong creating the image view for the textured image");
+		exit(1);
+	}
+	// not required! (taken care in the render pass)
+	transition_image_layout(session, session->depth_image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+}
+
 VkSession *vulkan_session_create(VkConfig *config){
 	if(config == NULL){
 		printf("Vulkan config is NULL.");
@@ -1373,8 +1482,9 @@ VkSession *vulkan_session_create(VkConfig *config){
 	create_render_pass(session);
 	createDescriptorSetLayout(session);
 	create_graphics_pipeline(session);
-	create_framebuffers(session);
 	create_command_pool(session);
+	create_depth_resources(session);
+	create_framebuffers(session); // after depth resources!
 	create_texture_image(session);
 	create_texture_image_view(session);
 	create_texture_sampler(session);
@@ -1427,6 +1537,9 @@ void vulkan_session_destroy(VkSession *session){
 	vkDestroyImageView(session->logical_device, session->texture_image_view, 0);
 	vkDestroyImage(session->logical_device, session->texture_image, 0);
 	vkFreeMemory(session->logical_device, session->texture_image_memory, 0);
+	vkDestroyImageView(session->logical_device, session->depth_image_view, 0);
+	vkDestroyImage(session->logical_device, session->depth_image, 0);
+	vkFreeMemory(session->logical_device, session->depth_image_memory, 0);
 	vkDestroyDescriptorPool(session->logical_device, session->descriptor_pool, 0);
 	vkDestroyDescriptorSetLayout(session->logical_device, session->descriptor_set_layout, 0);
 	vkDestroyBuffer(session->logical_device, session->vertex_buffer, NULL);
