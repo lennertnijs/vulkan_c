@@ -76,6 +76,10 @@ typedef struct {
 	int ubo_count;
 	VkDescriptorPool descriptor_pool;
 	VkDescriptorSet* descriptor_sets;
+	VkImage texture_image;
+	VkDeviceMemory texture_image_memory;
+	VkImageView texture_image_view;
+	VkSampler sampler;
 } VkSession;
 
 struct AuroraSession{

@@ -1,15 +1,13 @@
 #include <vulkan/vulkan.h>
 #include <glfw3.h>
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define STB_IMAGE_IMPLEMENTATION
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <cglm/cglm.h>
-
+#include "stb_image.h"
 #include "aurora_internal.h"
 #include "io.h"
 
@@ -59,6 +57,39 @@ bool supports_validation_layers(){
 		}
     }
     return true;
+}
+
+VkCommandBuffer begin_single_time_commands(VkSession* session) {
+	VkCommandBufferAllocateInfo alloc_info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandPool = session->command_pool,
+		.commandBufferCount = 1
+	};
+
+	VkCommandBuffer command_buffer = { 0 };
+	vkAllocateCommandBuffers(session->logical_device, &alloc_info, &command_buffer);
+
+	VkCommandBufferBeginInfo begin_info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+	};
+
+	vkBeginCommandBuffer(command_buffer, &begin_info);
+	return command_buffer;
+}
+
+void end_single_time_commands(VkSession* session, VkCommandBuffer command_buffer) {
+	vkEndCommandBuffer(command_buffer);
+
+	VkSubmitInfo submit_info = {
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &command_buffer
+	};
+	vkQueueSubmit(session->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+	vkQueueWaitIdle(session->graphics_queue);
+	vkFreeCommandBuffers(session->logical_device, session->command_pool, 1, &command_buffer);
 }
 
 void create_vk_instance(VkConfig *config, VkSession *session){
@@ -242,6 +273,7 @@ void create_logical_device(VkConfig *config, VkSession *session){
 	}
 	
 	VkPhysicalDeviceFeatures device_features = {0};
+	// device_features.samplerAnisotropy = VK_TRUE;
 
 	VkDeviceCreateInfo create_info = {0};
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -753,34 +785,15 @@ void create_buffer( VkSession *session,
 }
 
 void copy_buffer(VkSession *session, VkBuffer src, VkBuffer dst, VkDeviceSize size){
-	VkCommandBufferAllocateInfo info = {0};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	info.commandPool = session->command_pool;
-	info.commandBufferCount = 1;
-	
-	VkCommandBuffer command_buffer;
-	vkAllocateCommandBuffers(session->logical_device, &info, &command_buffer);
-
-	VkCommandBufferBeginInfo begin_info = {0};
-	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	vkBeginCommandBuffer(command_buffer, &begin_info);
+	VkCommandBuffer command_buffer = begin_single_time_commands(session);
 	
 	VkBufferCopy copy = {0};
 	copy.srcOffset = 0;
 	copy.dstOffset = 0;
 	copy.size = size;
 	vkCmdCopyBuffer(command_buffer, src, dst, 1, &copy);
-	vkEndCommandBuffer(command_buffer);
-	
-	VkSubmitInfo submit_info = {0};
-	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = &command_buffer;
-	vkQueueSubmit(session->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
-	vkQueueWaitIdle(session->graphics_queue);
-	vkFreeCommandBuffers(session->logical_device, session->command_pool, 1, &command_buffer);
+
+	end_single_time_commands(session, command_buffer);
 }
 
 
@@ -1098,6 +1111,185 @@ void create_descriptor_sets(VkSession* session) {
 	}
 }
 
+void create_image(VkSession* session, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage* image, VkDeviceMemory* image_memory) {
+	VkImageCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.imageType = VK_IMAGE_TYPE_2D,
+		.extent.width = width,
+		.extent.height = height,
+		.extent.depth = 1,
+		.mipLevels = 1,
+		.arrayLayers = 1,
+		.format = format,
+		.tiling = tiling,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.usage = usage,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.flags = 0
+	};
+	if (vkCreateImage(session->logical_device, &create_info, 0, image) != VK_SUCCESS) {
+		printf("Failed to create vk image for the texture!");
+		exit(1);
+	}
+
+	VkMemoryRequirements memory_req = { 0 };
+	vkGetImageMemoryRequirements(session->logical_device, *image, &memory_req);
+
+	VkMemoryAllocateInfo alloc_info = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize = memory_req.size,
+		.memoryTypeIndex = find_memory_type(session->physical_device, memory_req.memoryTypeBits, properties),
+	};
+	if (vkAllocateMemory(session->logical_device, &alloc_info, 0, image_memory) != VK_SUCCESS) {
+		printf("Failed to allocate texture memory!");
+		exit(1);
+	}
+	vkBindImageMemory(session->logical_device, *image, *image_memory, 0);
+}
+
+void transition_image_layout(VkSession* session, VkImage image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout) {
+	VkCommandBuffer command_buffer = begin_single_time_commands(session);
+
+	VkImageMemoryBarrier barrier = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.oldLayout = old_layout,
+		.newLayout = new_layout,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.image = image,
+		.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.subresourceRange.baseMipLevel = 0,
+		.subresourceRange.levelCount = 1,
+		.subresourceRange.baseArrayLayer = 0,
+		.subresourceRange.layerCount = 1,
+		.srcAccessMask = 0, // TODO
+		.dstAccessMask = 0
+	};
+
+	VkPipelineStageFlags srcStage = { 0 };
+	VkPipelineStageFlags dstStage = { 0 };
+	if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else {
+		printf("Invalid pipelines brev!");
+		exit(1);
+	}
+	vkCmdPipelineBarrier(command_buffer, srcStage, dstStage, 0, 0, 0, 0, 0, 1, &barrier);
+
+	end_single_time_commands(session, command_buffer);
+}
+
+void copy_buffer_to_image(VkSession* session, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+	VkCommandBuffer command_buffer = begin_single_time_commands(session);
+
+	VkBufferImageCopy region = {
+		.bufferOffset = 0,
+		.bufferRowLength = 0,
+		.bufferImageHeight = 0,
+		.imageSubresource = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.mipLevel = 0,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		},
+		.imageOffset = { 0, 0, 0 },
+		.imageExtent = {
+			session->image_extent.width,
+			session->image_extent.height,
+			1
+		}
+	};
+	vkCmdCopyBufferToImage(command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+	end_single_time_commands(session, command_buffer);
+}
+
+void create_texture_image(VkSession* session) {
+	int tex_width, tex_height, tex_channels;
+	stbi_uc* pixels = stbi_load("D:/vulkan_c/src/textures/texture.jpg", &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
+	VkDeviceSize image_size = tex_width * tex_height * 4;
+	if (!pixels) {
+		printf("Something went wrong loading the texture.jpg texture!");
+		exit(1);
+	}
+	VkBuffer staging_buffer = { 0 };
+	VkDeviceMemory staging_buffer_memory = { 0 };
+	create_buffer(session, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
+	void* data;
+	vkMapMemory(session->logical_device, staging_buffer_memory, 0, image_size, 0, &data);
+	memcpy(data, pixels, image_size);
+	vkUnmapMemory(session->logical_device, staging_buffer_memory);
+	stbi_image_free(pixels);
+
+	create_image(session, tex_width, tex_height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->texture_image, &session->texture_image_memory);
+
+	transition_image_layout(session, session->texture_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	copy_buffer_to_image(session, staging_buffer, session->texture_image, tex_width, tex_height);
+	transition_image_layout(session, session->texture_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+	vkDestroyBuffer(session->logical_device, staging_buffer, 0);
+	vkFreeMemory(session->logical_device, staging_buffer_memory, 0);
+}
+
+void create_texture_image_view(VkSession* session) {
+	VkImageViewCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = session->texture_image,
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+		.format = VK_FORMAT_R8G8B8A8_SRGB,
+		.subresourceRange = (VkImageSubresourceRange){
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 0
+		}
+	};
+	if (vkCreateImageView(session->logical_device, &create_info, 0, &session->texture_image_view) != VK_SUCCESS) {
+		printf("Something went wrong creating the image view for the textured image");
+		exit(1);
+	}
+}
+
+void create_texture_sampler(VkSession* session) {
+	VkPhysicalDeviceProperties physical_device_properties;
+	vkGetPhysicalDeviceProperties(session->physical_device, &physical_device_properties);
+	VkSamplerCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = physical_device_properties.limits.maxSamplerAnisotropy,
+		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+		.unnormalizedCoordinates = VK_FALSE,
+		.compareEnable = VK_FALSE,
+		.compareOp = VK_COMPARE_OP_ALWAYS,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.mipLodBias = 0.0f,
+		.minLod = 0.0f,
+		.maxLod = 0.0f
+	};
+	if (vkCreateSampler(session->logical_device, &create_info, 0, &session->sampler) != VK_SUCCESS) {
+		printf("Failed to create an image sampler.");
+		exit(1);
+	}
+}
+
 VkSession *vulkan_session_create(VkConfig *config){
 	if(config == NULL){
 		printf("Vulkan config is NULL.");
@@ -1116,6 +1308,9 @@ VkSession *vulkan_session_create(VkConfig *config){
 	create_graphics_pipeline(session);
 	create_framebuffers(session);
 	create_command_pool(session);
+	create_texture_image(session);
+	create_texture_image_view(session);
+	create_texture_sampler(session);
 	create_vertex_buffer(session);
 	create_index_buffer(session);
 	create_uniform_buffers(session);
@@ -1161,6 +1356,10 @@ void vulkan_session_destroy(VkSession *session){
 		vkDestroyBuffer(session->logical_device, session->uniform_buffers[i], 0);
 		vkFreeMemory(session->logical_device, session->uniform_buffers_memory[i], 0);
 	}
+	vkDestroySampler(session->logical_device, session->sampler, 0);
+	vkDestroyImageView(session->logical_device, session->texture_image_view, 0);
+	vkDestroyImage(session->logical_device, session->texture_image, 0);
+	vkFreeMemory(session->logical_device, session->texture_image_memory, 0);
 	vkDestroyDescriptorPool(session->logical_device, session->descriptor_pool, 0);
 	vkDestroyDescriptorSetLayout(session->logical_device, session->descriptor_set_layout, 0);
 	vkDestroyBuffer(session->logical_device, session->vertex_buffer, NULL);
