@@ -45,15 +45,19 @@ void aurora_session_start(AuroraConfig *config){
     // Define rectangle vertices (positions in XY plane)
     vertices[0].position = (vec2s){ -0.5f, -0.5f };
     vertices[0].color = (vec3s){ 1.0f, 0.0f, 0.0f }; // Red - bottom left
+    vertices[0].text_coord = (vec2s){ 1.0f, 0.0f };
 
     vertices[1].position = (vec2s){ 0.5f, -0.5f };
     vertices[1].color = (vec3s){ 0.0f, 1.0f, 0.0f }; // Green - bottom right
+    vertices[1].text_coord = (vec2s){ 0.0f, 0.0f };
 
     vertices[2].position = (vec2s){ 0.5f, 0.5f };
     vertices[2].color = (vec3s){ 0.0f, 0.0f, 1.0f }; // Blue - top right
+    vertices[2].text_coord = (vec2s){ 0.0f, 1.0f };
 
     vertices[3].position = (vec2s){ -0.5f, 0.5f };
     vertices[3].color = (vec3s){ 1.0f, 1.0f, 0.0f }; // Yellow - top left
+    vertices[3].text_coord = (vec2s){ 1.0f, 1.0f };
 
     // Define indices for two triangles composing the rectangle
     indices[0] = 0; // first triangle

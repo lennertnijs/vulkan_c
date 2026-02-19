@@ -253,6 +253,13 @@ void create_logical_device(VkConfig *config, VkSession *session){
 		abort();
 	}
 
+	VkPhysicalDeviceFeatures physical_device_features;
+	vkGetPhysicalDeviceFeatures(session->physical_device, &physical_device_features);
+	if (!physical_device_features.samplerAnisotropy) {
+		printf("No anisotropy sampler supported!");
+		exit(1);
+	}
+
 	float priority = 1.0f;		
 	bool queue_shared = session->graphics_queue_index == session->present_queue_index;
 	int queue_count = queue_shared ? 1 : 2;
@@ -273,7 +280,7 @@ void create_logical_device(VkConfig *config, VkSession *session){
 	}
 	
 	VkPhysicalDeviceFeatures device_features = {0};
-	// device_features.samplerAnisotropy = VK_TRUE;
+	device_features.samplerAnisotropy = VK_TRUE;
 
 	VkDeviceCreateInfo create_info = {0};
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -468,10 +475,11 @@ VkShaderModule create_shader_module(VkSession *session, char* code, size_t lengt
 }
 
 VkVertexInputBindingDescription get_binding_description(){
-	VkVertexInputBindingDescription description = {0};
-	description.binding = 0;
-	description.stride = sizeof(Vertex);
-	description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	VkVertexInputBindingDescription description = {
+		.binding = 0,
+		.stride = sizeof(Vertex),
+		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+	};
 	return description;
 }
 
@@ -489,10 +497,22 @@ VkVertexInputAttributeDescription* get_attribute_descriptions(){
 		.format = VK_FORMAT_R32G32B32_SFLOAT,
 		.offset = offsetof(Vertex, color)
 	};
+
+	VkVertexInputAttributeDescription description3 = {
+		.location = 2,
+		.binding = 0,
+		.format = VK_FORMAT_R32G32_SFLOAT,
+		.offset = offsetof(Vertex, text_coord)
+	};
 	
-	VkVertexInputAttributeDescription* attribute_descriptions = malloc(sizeof(VkVertexInputAttributeDescription) * 2);
+	VkVertexInputAttributeDescription* attribute_descriptions = malloc(sizeof(VkVertexInputAttributeDescription) * 3);
+	if (attribute_descriptions == 0) {
+		printf("Something went wrong mallocing the vertex input attribute descriptions");
+		exit(1);
+	}
 	attribute_descriptions[0] = description1;
 	attribute_descriptions[1] = description2;
+	attribute_descriptions[2] = description3;
 	return attribute_descriptions;
 }
 
@@ -524,7 +544,7 @@ void create_graphics_pipeline(VkSession *session){
 	vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertex_input_info.vertexBindingDescriptionCount = 1;
 	vertex_input_info.pVertexBindingDescriptions = &binding_description;
-	vertex_input_info.vertexAttributeDescriptionCount = 2;
+	vertex_input_info.vertexAttributeDescriptionCount = 3;
 	vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions;
 	
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info = {0};
@@ -1032,10 +1052,24 @@ void createDescriptorSetLayout(VkSession* session) {
 		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		.pImmutableSamplers = 0
 	};
+	VkDescriptorSetLayoutBinding sampler_layout_binding = {
+		.binding = 1,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.pImmutableSamplers = 0,
+		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT
+	};
+	VkDescriptorSetLayoutBinding* bindings = malloc(sizeof(VkDescriptorSetLayoutBinding) * 2);
+	if (bindings == 0) {
+		printf("Failed to malloc memory for bindings!");
+		exit(1);
+	}
+	bindings[0] = uboLayoutBinding;
+	bindings[1] = sampler_layout_binding;
 	VkDescriptorSetLayoutCreateInfo layout_info = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.bindingCount = 1,
-		.pBindings = &uboLayoutBinding
+		.bindingCount = 2,
+		.pBindings = bindings
 	};
 	if (vkCreateDescriptorSetLayout(session->logical_device, &layout_info, 0, &session->descriptor_set_layout) != VK_SUCCESS) {
 		printf("Failed to create descriptor set!");
@@ -1060,10 +1094,22 @@ void create_descriptor_pool(VkSession* session) {
 		.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 		.descriptorCount = (uint32_t)MAX_FRAMES_IN_FLIGHT
 	};
+	VkDescriptorPoolSize sampler_pool_size = {
+		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.descriptorCount = (uint32_t)MAX_FRAMES_IN_FLIGHT
+	};
+	VkDescriptorPoolSize* pool_sizes = malloc(sizeof(VkDescriptorPoolSize) * 2);
+	if (pool_sizes == 0) {
+		printf("Something went wrong mallocating the pool_sizes array for descriptor pools.");
+		exit(1);
+	}
+	pool_sizes[0] = pool_size;
+	pool_sizes[1] = sampler_pool_size;
+
 	VkDescriptorPoolCreateInfo create_info = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.poolSizeCount = 1,
-		.pPoolSizes = &pool_size,
+		.poolSizeCount = 2,
+		.pPoolSizes = pool_sizes,
 		.maxSets = (uint32_t)MAX_FRAMES_IN_FLIGHT,
 		.flags = 0
 	};
@@ -1096,7 +1142,12 @@ void create_descriptor_sets(VkSession* session) {
 			.offset = 0,
 			.range = sizeof(UniformBufferObject)
 		};
-		VkWriteDescriptorSet write = {
+		VkDescriptorImageInfo image_info = {
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.imageView = session->texture_image_view,
+			.sampler = session->sampler
+		};
+		VkWriteDescriptorSet ubo_writer = {
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = session->descriptor_sets[i],
 			.dstBinding = 0,
@@ -1107,7 +1158,23 @@ void create_descriptor_sets(VkSession* session) {
 			.pImageInfo = 0,
 			.pTexelBufferView = 0
 		};
-		vkUpdateDescriptorSets(session->logical_device, 1, &write, 0, 0);
+		VkWriteDescriptorSet image_writer = {
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = session->descriptor_sets[i],
+			.dstBinding = 1,
+			.dstArrayElement = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.pImageInfo = &image_info
+		};
+		VkWriteDescriptorSet* write_descriptor_sets = malloc(sizeof(VkWriteDescriptorSet) * 2);
+		if (write_descriptor_sets == 0) {
+			printf("Failed to allocate write descriptor sets");
+			exit(1);
+		}
+		write_descriptor_sets[0] = ubo_writer;
+		write_descriptor_sets[1] = image_writer;
+		vkUpdateDescriptorSets(session->logical_device, 2, write_descriptor_sets, 0, 0);
 	}
 }
 
@@ -1206,8 +1273,8 @@ void copy_buffer_to_image(VkSession* session, VkBuffer buffer, VkImage image, ui
 		},
 		.imageOffset = { 0, 0, 0 },
 		.imageExtent = {
-			session->image_extent.width,
-			session->image_extent.height,
+			width,
+			height,
 			1
 		}
 	};
@@ -1254,7 +1321,7 @@ void create_texture_image_view(VkSession* session) {
 			.baseMipLevel = 0,
 			.levelCount = 1,
 			.baseArrayLayer = 0,
-			.layerCount = 0
+			.layerCount = 1
 		}
 	};
 	if (vkCreateImageView(session->logical_device, &create_info, 0, &session->texture_image_view) != VK_SUCCESS) {

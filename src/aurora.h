@@ -9,6 +9,7 @@
 typedef struct {
 	vec2s position;
 	vec3s color;
+	vec2s text_coord;
 } Vertex;
 
 typedef struct AuroraConfig AuroraConfig;
