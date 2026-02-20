@@ -67,7 +67,7 @@ typedef struct {
 	VkFence *in_flight_fences;
 	Vertex *vertices;
 	int vertex_count;
-	uint16_t *indices;
+	uint32_t *indices;
 	int index_count;
 	VkDescriptorSetLayout descriptor_set_layout;
 	VkBuffer* uniform_buffers;

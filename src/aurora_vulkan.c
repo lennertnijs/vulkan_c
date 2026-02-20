@@ -2,6 +2,7 @@
 #include <glfw3.h>
 #define STB_IMAGE_IMPLEMENTATION
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include <string.h>
 #include <cglm/cglm.h>
 #include "stb_image.h"
+#include "tinyobj_loader_c.h"
 #include "aurora_internal.h"
 #include "io.h"
 
@@ -18,6 +20,9 @@ const int extension_count = 1;
 const char* extensions[] = {"VK_KHR_swapchain"};
 const int MAX_FRAMES_IN_FLIGHT = 2;
 uint32_t current_frame = 0;
+
+const char* MODEL_PATH = "D:/vulkan_c/src/models/viking_room.obj";
+const char* TEXTURE_PATH = "D:/vulkan_c/src/textures/viking_room.png";
 
 typedef struct {
 	mat4 model;
@@ -771,7 +776,7 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	VkBuffer vertex_buffers[] = {session->vertex_buffer};
 	VkDeviceSize offsets[] = {0};
 	vkCmdBindVertexBuffers(session->command_buffers[current_frame], 0, 1, vertex_buffers, offsets);
-	vkCmdBindIndexBuffer(session->command_buffers[current_frame], session->index_buffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(session->command_buffers[current_frame], session->index_buffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(session->command_buffers[current_frame], VK_PIPELINE_BIND_POINT_GRAPHICS, session->pipeline_layout, 0, 1, &session->descriptor_sets[current_frame], 0, 0);
 	vkCmdDrawIndexed(session->command_buffers[current_frame], session->index_count, 1, 0, 0, 0);
 	
@@ -882,7 +887,7 @@ void create_vertex_buffer(VkSession *session){
 
 
 void create_index_buffer(VkSession *session){
-	VkDeviceSize buffer_size = sizeof(uint16_t) * session->index_count;
+	VkDeviceSize buffer_size = sizeof(uint32_t) * session->index_count;
 
 	VkBuffer staging_buffer;
 	VkDeviceMemory staging_buffer_memory;
@@ -1350,7 +1355,7 @@ void copy_buffer_to_image(VkSession* session, VkBuffer buffer, VkImage image, ui
 
 void create_texture_image(VkSession* session) {
 	int tex_width, tex_height, tex_channels;
-	stbi_uc* pixels = stbi_load("D:/vulkan_c/src/textures/texture.jpg", &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
+	stbi_uc* pixels = stbi_load(TEXTURE_PATH, &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
 	VkDeviceSize image_size = tex_width * tex_height * 4;
 	if (!pixels) {
 		printf("Something went wrong loading the texture.jpg texture!");
@@ -1466,12 +1471,118 @@ void create_depth_resources(VkSession* session) {
 	transition_image_layout(session, session->depth_image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
+void tinyobj_file_reader(void* ctx, const char* filename, int is_mtl, const char* obj_filename, char** buf, size_t* len) {
+	// Open file in binary mode to avoid newline translation issues
+	FILE* file = fopen(filename, "rb");
+	if (!file) {
+		fprintf(stderr, "Error: Could not open file %s\n", filename);
+		*buf = NULL;
+		*len = 0;
+		return;
+	}
+
+	// Seek to end to determine size
+	fseek(file, 0, SEEK_END);
+	long size = ftell(file);
+	fseek(file, 0, SEEK_SET);
+
+	if (size < 0) {
+		fclose(file);
+		*buf = NULL;
+		*len = 0;
+		return;
+	}
+
+	// Allocate buffer. tinyobjloader-c expects the user to allocate this.
+	// Note: If you want to use one of your 2 arenas, swap malloc for your arena_alloc here.
+	char* data = (char*)malloc(size + 1);
+	if (!data) {
+		fclose(file);
+		*buf = NULL;
+		*len = 0;
+		return;
+	}
+
+	size_t read_size = fread(data, 1, size, file);
+	data[read_size] = '\0'; // Null-terminate just in case, though not strictly required
+
+	*buf = data;
+	*len = read_size;
+
+	fclose(file);
+}
+
+void load_model(VkSession* session) {
+	tinyobj_attrib_t attrib;
+	tinyobj_shape_t* shapes = 0;
+	size_t num_shapes;
+	tinyobj_material_t* materials = 0;
+	size_t num_materials;
+	tinyobj_attrib_init(&attrib);
+	if (tinyobj_parse_obj(&attrib, &shapes, &num_shapes, &materials, &num_materials, MODEL_PATH, tinyobj_file_reader, 0, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS) {
+		printf("Failed to parse .obj file.");
+		exit(1);
+	}
+	Vertex* vertices = NULL;
+	size_t num_vertices = 0;
+
+	unsigned int* indices = NULL;
+	size_t num_indices = 0;
+	// we do not check for duplicated vertices, so we do not use the index buffer :?
+	for (size_t s = 0; s < num_shapes; s++) {
+		tinyobj_shape_t* shape = &shapes[s];
+
+		for (unsigned int f = 0; f < shape->length; f++) {
+			unsigned int face_idx = shape->face_offset + f;
+			unsigned int num_verts_in_face = attrib.face_num_verts[face_idx];
+
+			for (unsigned int v = 0; v < num_verts_in_face; v++) {
+				tinyobj_vertex_index_t idx = attrib.faces[face_idx * 3 + v];
+
+				Vertex vertex;
+
+				// Position
+				vertex.position.x = attrib.vertices[3 * idx.v_idx + 0];
+				vertex.position.y = attrib.vertices[3 * idx.v_idx + 1];
+				vertex.position.z = attrib.vertices[3 * idx.v_idx + 2];
+
+				// Texture coordinates (check if valid)
+				if (idx.vt_idx >= 0) {
+					vertex.text_coord.x = attrib.texcoords[2 * idx.vt_idx + 0];
+					vertex.text_coord.y = 1.0f - attrib.texcoords[2 * idx.vt_idx + 1];
+				}
+				else {
+					vertex.text_coord.x = 0.0f;
+					vertex.text_coord.y = 0.0f;
+				}
+
+				// Color (white)
+				vertex.color.x = 1.0f;
+				vertex.color.y = 1.0f;
+				vertex.color.z = 1.0f;
+
+				// Add vertex
+				vertices = (Vertex*)realloc(vertices, (num_vertices + 1) * sizeof(Vertex));
+				vertices[num_vertices++] = vertex;
+
+				// Add index
+				indices = (unsigned int*)realloc(indices, (num_indices + 1) * sizeof(unsigned int));
+				indices[num_indices++] = (unsigned int)(num_indices);
+			}
+		}
+	}
+	session->vertices = vertices;
+	session->vertex_count = num_vertices;
+	session->indices = indices;
+	session->index_count = num_indices;
+}
+
 VkSession *vulkan_session_create(VkConfig *config){
 	if(config == NULL){
 		printf("Vulkan config is NULL.");
 	}
 	VkSession *session = malloc(sizeof(VkSession));
-	init_vertices(config, session);
+	// init_vertices(config, session);
 	create_vk_instance(config, session);
 	create_window(session);
 	create_surface(session);
@@ -1488,6 +1599,7 @@ VkSession *vulkan_session_create(VkConfig *config){
 	create_texture_image(session);
 	create_texture_image_view(session);
 	create_texture_sampler(session);
+	load_model(session);
 	create_vertex_buffer(session);
 	create_index_buffer(session);
 	create_uniform_buffers(session);
