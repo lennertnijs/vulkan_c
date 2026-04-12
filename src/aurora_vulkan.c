@@ -7,12 +7,12 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <cglm/cglm.h>
 #include "stb_image.h"
 #include "tinyobj_loader_c.h"
 #include "aurora_internal.h"
 #include "io.h"
+#include "buffer.h"
 
 const int validation_layer_count = 1;
 const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
@@ -68,12 +68,13 @@ bool supports_validation_layers(){
 VkCommandBuffer begin_single_time_commands(VkSession* session) {
 	VkCommandBufferAllocateInfo alloc_info = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.pNext = 0,
 		.commandPool = session->command_pool,
-		.commandBufferCount = 1
+		.commandBufferCount = 1,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY
 	};
 
-	VkCommandBuffer command_buffer = { 0 };
+	VkCommandBuffer command_buffer;
 	vkAllocateCommandBuffers(session->logical_device, &alloc_info, &command_buffer);
 
 	VkCommandBufferBeginInfo begin_info = {
@@ -285,8 +286,9 @@ void create_logical_device(VkConfig *config, VkSession *session){
 		};
 	}
 	
-	VkPhysicalDeviceFeatures device_features = {0};
-	device_features.samplerAnisotropy = VK_TRUE;
+	VkPhysicalDeviceFeatures device_features = {
+		.samplerAnisotropy = VK_TRUE
+	};
 
 	VkDeviceCreateInfo create_info = {0};
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -312,7 +314,7 @@ void create_logical_device(VkConfig *config, VkSession *session){
 
 void create_swapchain(VkSession *session)
 {
-	VkSurfaceCapabilitiesKHR capabilities= {0};
+	VkSurfaceCapabilitiesKHR capabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(session->physical_device, session->surface, &capabilities);
 
 	session->image_count = capabilities.minImageCount + 1;
@@ -427,29 +429,31 @@ void create_image_views(VkSession *session){
 
 
 void create_render_pass(VkSession *session){
-	VkAttachmentDescription color_attachment = {0};
-	color_attachment.format = session->image_format.format;
-	color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	VkAttachmentDescription color_attachment = {
+		.format = session->image_format.format, // swapchain image format
+		.samples = VK_SAMPLE_COUNT_1_BIT, // 1 sample (no multisampling yet)
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // clear the framebuffer (to black) before drawing in this render pass
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // to be presented in the swapchain
+	};
 
-	VkAttachmentReference color_attachment_reference = {0};
-	color_attachment_reference.attachment = 0; // fragment shader index location = 0
-	color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	VkAttachmentReference color_attachment_reference = {
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	};
 	
 	VkAttachmentDescription depth_attachment = {
-	.format = find_depth_format(session),
-	.samples = VK_SAMPLE_COUNT_1_BIT,
-	.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-	.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-	.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-	.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-	.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+		.format = find_depth_format(session),
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	};
 
 	VkAttachmentReference depth_attachment_reference = {
@@ -457,11 +461,12 @@ void create_render_pass(VkSession *session){
 		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	};
 
-	VkSubpassDescription subpass = {0};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &color_attachment_reference;
-	subpass.pDepthStencilAttachment = &depth_attachment_reference;
+	VkSubpassDescription subpass = {
+		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &color_attachment_reference, // The fragment shader layout(location = X) directly maps to the index X inside pColorAttachments
+		.pDepthStencilAttachment = &depth_attachment_reference,
+	};
 
 	VkSubpassDependency dependency = {0};
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -472,14 +477,15 @@ void create_render_pass(VkSession *session){
 	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT; 
 
 	VkAttachmentDescription attachment_descriptions[2] = { color_attachment, depth_attachment };
-	VkRenderPassCreateInfo render_pass_create_info = {0};
-	render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	render_pass_create_info.attachmentCount = 2;
-	render_pass_create_info.pAttachments = &attachment_descriptions;
-	render_pass_create_info.subpassCount = 1;
-	render_pass_create_info.pSubpasses = &subpass;
-	render_pass_create_info.dependencyCount = 1;
-	render_pass_create_info.pDependencies = &dependency;
+	VkRenderPassCreateInfo render_pass_create_info = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount = 2,
+		.pAttachments = &attachment_descriptions,
+		.subpassCount = 1,
+		.pSubpasses = &subpass,
+		.dependencyCount = 1,
+		.pDependencies = &dependency
+	};
 	if(vkCreateRenderPass(session->logical_device, &render_pass_create_info, NULL, &session->render_pass)){
 		printf("Failed to create a render pass.\n");
 		abort();
@@ -719,21 +725,26 @@ void create_framebuffers(VkSession *session){
 
 
 void create_command_pool(VkSession *session){
-	VkCommandPoolCreateInfo command_pool_create_info = {0};
-	command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	command_pool_create_info.flags =  VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	command_pool_create_info.queueFamilyIndex = session->graphics_queue_index;
-	VkResult result = vkCreateCommandPool(session->logical_device, &command_pool_create_info, NULL, &session->command_pool);
-	assert(result == VK_SUCCESS);
+	VkCommandPoolCreateInfo command_pool_create_info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+		.queueFamilyIndex = session->graphics_queue_index
+	};
+	if (vkCreateCommandPool(session->logical_device, &command_pool_create_info, NULL, &session->command_pool) != VK_SUCCESS) {
+		printf("Failed to create a command pool!");
+		abort();
+	}
 }
 
-void allocate_command_buffers(VkSession *session){
+void allocate_command_buffers(VkSession *session)
+{
 	session->command_buffers = malloc(sizeof(VkCommandBuffer) * MAX_FRAMES_IN_FLIGHT);
-	VkCommandBufferAllocateInfo info = {0};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	info.commandPool = session->command_pool;
-	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	info.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
+	VkCommandBufferAllocateInfo info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = session->command_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = MAX_FRAMES_IN_FLIGHT
+	};
 	VkResult result = vkAllocateCommandBuffers(session->logical_device, &info, &session->command_buffers[0]);
 	assert(result == VK_SUCCESS);
 }
@@ -797,31 +808,6 @@ uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 	assert(0 == 1);
 }
 
-static bool create_buffer2(VkSession* session,
-	VkDeviceSize size,
-	VkBufferUsageFlags usageFlags,
-	VkBuffer* buffer)
-{
-	VkBufferCreateInfo info = { 0 };
-	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.size = size;
-	info.usage = usageFlags;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	return vkCreateBuffer(session->logical_device, &info, NULL, buffer) != VK_SUCCESS;
-}
-
-static bool allocate_memory(VkSession* session,
-	VkMemoryRequirements requirements,
-	VkMemoryPropertyFlags propertyFlags,
-	VkDeviceMemory* memory)
-{
-	VkMemoryAllocateInfo info = { 0 };
-	info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	info.allocationSize = requirements.size;
-	info.memoryTypeIndex = find_memory_type(session->physical_device, requirements.memoryTypeBits, propertyFlags);
-	return vkAllocateMemory(session->logical_device, &info, NULL, memory) != VK_SUCCESS;
-}
-
 void create_buffer( VkSession *session, 
 					VkDeviceSize size, 
 					VkBufferUsageFlags usage, 
@@ -846,63 +832,6 @@ void create_buffer( VkSession *session,
 	result = vkAllocateMemory(session->logical_device, &alloc_info, NULL, buffer_memory);
 	assert(result == VK_SUCCESS);
 	vkBindBufferMemory(session->logical_device, *buffer, *buffer_memory, 0);
-}
-
-void copy_buffer(VkSession *session, VkBuffer src, VkBuffer dst, VkDeviceSize size){
-	VkCommandBuffer command_buffer = begin_single_time_commands(session);
-	
-	VkBufferCopy copy = {0};
-	copy.srcOffset = 0;
-	copy.dstOffset = 0;
-	copy.size = size;
-	vkCmdCopyBuffer(command_buffer, src, dst, 1, &copy);
-
-	end_single_time_commands(session, command_buffer);
-}
-
-
-void create_vertex_buffer(VkSession *session){
-	VkDeviceSize buffer_size = sizeof(Vertex) * session->vertex_count;
-
-	VkBuffer staging_buffer;
-	create_buffer2(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &staging_buffer);
-	VkMemoryRequirements requirements;
-	vkGetBufferMemoryRequirements(session->logical_device, staging_buffer, &requirements);
-	VkDeviceMemory staging_buffer_memory;
-	allocate_memory(session, requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer_memory);
-	vkBindBufferMemory(session->logical_device, staging_buffer, staging_buffer_memory, 0);
-
-	void* data;
-	vkMapMemory(session->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, session->vertices, (size_t) buffer_size);
-	vkUnmapMemory(session->logical_device, staging_buffer_memory);
-	
-	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-	  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->vertex_buffer, &session->vertex_buffer_memory);
-	copy_buffer(session, staging_buffer, session->vertex_buffer, buffer_size);
-
-	vkDestroyBuffer(session->logical_device, staging_buffer, NULL);
-	vkFreeMemory(session->logical_device, staging_buffer_memory, NULL);
-}
-
-
-void create_index_buffer(VkSession *session){
-	VkDeviceSize buffer_size = sizeof(uint32_t) * session->index_count;
-
-	VkBuffer staging_buffer;
-	VkDeviceMemory staging_buffer_memory;
-	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
-
-	void* data;
-	vkMapMemory(session->logical_device, staging_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, session->indices, (size_t) buffer_size);
-	vkUnmapMemory(session->logical_device, staging_buffer_memory);
-	
-	create_buffer(session, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &session->index_buffer, &session->index_buffer_memory);
-	copy_buffer(session, staging_buffer, session->index_buffer, buffer_size);
-
-	vkDestroyBuffer(session->logical_device, staging_buffer, NULL);
-	vkFreeMemory(session->logical_device, staging_buffer_memory, NULL);
 }
 
 void create_sync_objects(VkSession *session){
@@ -1043,54 +972,6 @@ void init_vertices(VkConfig *config, VkSession *session){
 	session->vertex_count = config->vertex_count;
 	session->indices = config->indices;
 	session->index_count = config->index_count;
-}
-
-void recreate_vertices(VkSession *session, Vertex *vertices, int vertex_count, uint16_t *indices, int index_count){
-	vkDeviceWaitIdle(session->logical_device);
-	session->vertices = malloc(sizeof(Vertex) * vertex_count);
-	for(int i = 0; i < vertex_count; i++){
-		session->vertices[i] = vertices[i];
-	}
-	session->vertex_count = vertex_count;
-
-	session->indices = malloc(sizeof(uint16_t) * index_count);
-	for(int i = 0; i < index_count; i++){
-		session->indices[i] = indices[i];
-	}
-	session->index_count = index_count;
-	
-
-	vkDestroyBuffer(session->logical_device, session->vertex_buffer, NULL);
-	vkFreeMemory(session->logical_device, session->vertex_buffer_memory, NULL);
-	vkDestroyBuffer(session->logical_device, session->index_buffer, NULL);
-	vkFreeMemory(session->logical_device, session->index_buffer_memory, NULL);
-
-	create_vertex_buffer(session);
-	create_index_buffer(session);
-}
-
-
-void add_vertices(VkSession *session, Vertex *vertices, int vertex_count, uint16_t *indices, int index_count){
-	vkDeviceWaitIdle(session->logical_device);
-	session->vertices = realloc(session->vertices, sizeof(Vertex) * (session->vertex_count + vertex_count));	
-	for(int i = 0; i < vertex_count; i++){
-		session->vertices[session->vertex_count + i] = vertices[i];
-	}
-	session->vertex_count += vertex_count;
-	session->indices = realloc(session->indices, sizeof(uint16_t) * (session->index_count + index_count));
-	for(int i = 0; i < index_count; i++){
-		session->indices[session->index_count + i] = indices[i];
-	}
-	session->index_count += index_count;
-	
-
-	vkDestroyBuffer(session->logical_device, session->vertex_buffer, NULL);
-	vkFreeMemory(session->logical_device, session->vertex_buffer_memory, NULL);
-	vkDestroyBuffer(session->logical_device, session->index_buffer, NULL);
-	vkFreeMemory(session->logical_device, session->index_buffer_memory, NULL);
-
-	create_vertex_buffer(session);
-	create_index_buffer(session); // todo
 }
 
 void createDescriptorSetLayout(VkSession* session) {
@@ -1600,8 +1481,12 @@ VkSession *vulkan_session_create(VkConfig *config){
 	create_texture_image_view(session);
 	create_texture_sampler(session);
 	load_model(session);
-	create_vertex_buffer(session);
-	create_index_buffer(session);
+	Buffer vertex_buffer = create_vertex_buffer(session->physical_device, session->logical_device, session->vertices, session->vertex_count, session->command_pool, session->graphics_queue);
+	session->vertex_buffer = vertex_buffer.buffer;
+	session->vertex_buffer_memory = vertex_buffer.memory;
+	Buffer index_buffer = create_index_buffer(session->physical_device, session->logical_device, session->indices, session->index_count, session->command_pool, session->graphics_queue);
+	session->index_buffer = index_buffer.buffer;
+	session->index_buffer_memory = index_buffer.memory;
 	create_uniform_buffers(session);
 	create_descriptor_pool(session);
 	create_descriptor_sets(session);
