@@ -4,7 +4,6 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include <stdbool.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cglm/cglm.h>
@@ -30,21 +29,27 @@ typedef struct {
 	mat4 proj;
 } UniformBufferObject;
 
-void create_window(VkSession* session) {
-	assert(session != NULL);
+void create_window(VkSession* session)
+{
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // dont use openGL
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     session->window = glfwCreateWindow(800, 600, "Vulkan", NULL, NULL);
-	assert(session->window != NULL);
+	if (!session->window) {
+		printf("Failed to create the glfw window.\n");
+		exit(1);
+	}
 }
 
-void create_surface(VkSession *session){
-	assert(session != NULL);
-	VkResult result = glfwCreateWindowSurface(session->instance, session->window, NULL, &session->surface);
-	assert(result == VK_SUCCESS);
+void create_surface(VkSession *session)
+{
+	if (glfwCreateWindowSurface(session->instance, session->window, NULL, &session->surface) != VK_SUCCESS) {
+		printf("Failed to create the glfw window surface.\n");
+		exit(1);
+	}
 }
 
-bool supports_validation_layers(){
+bool supports_validation_layers()
+{
     uint32_t supported_layer_count = 0;
     vkEnumerateInstanceLayerProperties(&supported_layer_count, NULL);
     VkLayerProperties *supported_layers = malloc(sizeof(VkLayerProperties) * supported_layer_count);
@@ -65,7 +70,8 @@ bool supports_validation_layers(){
     return true;
 }
 
-VkCommandBuffer begin_single_time_commands(VkSession* session) {
+VkCommandBuffer begin_single_time_commands(VkSession* session)
+{
 	VkCommandBufferAllocateInfo alloc_info = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.pNext = 0,
@@ -134,7 +140,10 @@ bool has_graphics_queue(VkPhysicalDevice physical_device){
 	uint32_t count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, NULL);
 	VkQueueFamilyProperties *properties = malloc(sizeof(VkQueueFamilyProperties) * count);
-	assert(properties != NULL);
+	if (!properties) {
+		printf("Could not malloc the queue family properties.\n");
+		exit(1);
+	}
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, properties);
 	
 	bool supports_graphics = false;
@@ -152,7 +161,10 @@ bool has_present_queue(VkPhysicalDevice physical_device, VkSurfaceKHR surface){
 	uint32_t count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, NULL);
 	VkQueueFamilyProperties *properties = malloc(sizeof(VkQueueFamilyProperties) * count);
-	assert(properties != NULL);
+	if (!properties) {
+		printf("Could not malloc the queue family properties.\n");
+		exit(1);
+	}
 	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, properties);
 
 	VkBool32 supports_presenting = VK_FALSE;
@@ -659,8 +671,10 @@ void create_graphics_pipeline(VkSession *session){
 	pipeline_layout_create_info.pSetLayouts = &session->descriptor_set_layout;
 	pipeline_layout_create_info.pushConstantRangeCount = 0;
 	pipeline_layout_create_info.pPushConstantRanges = NULL;
-	VkResult result = vkCreatePipelineLayout(session->logical_device, &pipeline_layout_create_info, NULL, &session->pipeline_layout);
-	assert(result == VK_SUCCESS);
+	if (vkCreatePipelineLayout(session->logical_device, &pipeline_layout_create_info, NULL, &session->pipeline_layout) != VK_SUCCESS) {
+		printf("Could not create graphics pipeline layout.\n");
+		exit(1);
+	}
 
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_create_info = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -693,15 +707,18 @@ void create_graphics_pipeline(VkSession *session){
 	graphics_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
 	graphics_pipeline_create_info.basePipelineIndex = -1;
 
-	result = vkCreateGraphicsPipelines(session->logical_device, VK_NULL_HANDLE, 1, &graphics_pipeline_create_info, NULL, &session->graphics_pipeline);
-	assert(result == VK_SUCCESS);
+	if (vkCreateGraphicsPipelines(session->logical_device, VK_NULL_HANDLE, 1, &graphics_pipeline_create_info, NULL, &session->graphics_pipeline) != VK_SUCCESS) {
+		printf("Could not create graphics pipeline.\n");
+		exit(1);
+	}
 	free(attribute_descriptions);
 	vkDestroyShaderModule(session->logical_device, fragment_shader_module, NULL);
 	vkDestroyShaderModule(session->logical_device, vertex_shader_module, NULL);	
 }
 
 
-void create_framebuffers(VkSession *session){
+void create_framebuffers(VkSession *session)
+{
 	session->frame_buffers = malloc(sizeof(VkFramebuffer) * session->image_count);
 	if (session->frame_buffers == 0) {
 		exit(1);
@@ -745,8 +762,10 @@ void allocate_command_buffers(VkSession *session)
 		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount = MAX_FRAMES_IN_FLIGHT
 	};
-	VkResult result = vkAllocateCommandBuffers(session->logical_device, &info, &session->command_buffers[0]);
-	assert(result == VK_SUCCESS);
+	if (vkAllocateCommandBuffers(session->logical_device, &info, &session->command_buffers[0]) != VK_SUCCESS) {
+		printf("Could not allocate command buffer.\n");
+		exit(1);
+	}
 }
 
 
@@ -755,8 +774,10 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	begin_info.flags = 0;
 	begin_info.pInheritanceInfo = NULL;
-	VkResult result = vkBeginCommandBuffer(session->command_buffers[current_frame], &begin_info);
-	assert(result == VK_SUCCESS);
+	if (vkBeginCommandBuffer(session->command_buffers[current_frame], &begin_info) != VK_SUCCESS) {
+		printf("Could not begin command buffer.\n");
+		exit(1);
+	}
 	VkRenderPassBeginInfo render_pass_info = {0};
 	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	render_pass_info.renderPass = session->render_pass;
@@ -792,8 +813,10 @@ void record_command_buffer(VkSession *session, uint32_t image_index){
 	vkCmdDrawIndexed(session->command_buffers[current_frame], session->index_count, 1, 0, 0, 0);
 	
 	vkCmdEndRenderPass(session->command_buffers[current_frame]);
-	result = vkEndCommandBuffer(session->command_buffers[current_frame]);
-	assert(result == VK_SUCCESS);	
+	if (vkEndCommandBuffer(session->command_buffers[current_frame]) != VK_SUCCESS) {
+		printf("Could not end command buffer.\n");
+		exit(1);
+	}	
 }
 
 
@@ -805,7 +828,7 @@ uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 			return i;
 		}
 	}
-	assert(0 == 1);
+	exit(1);
 }
 
 void create_buffer( VkSession *session, 
@@ -820,8 +843,10 @@ void create_buffer( VkSession *session,
 	info.size = size;
 	info.usage = usage;
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	VkResult result = vkCreateBuffer(session->logical_device, &info, NULL, buffer);
-	assert(result == VK_SUCCESS);
+	if (vkCreateBuffer(session->logical_device, &info, NULL, buffer) != VK_SUCCESS) {
+		printf("Could not create buffer.\n");
+		exit(1);
+	}
 	VkMemoryRequirements requirements;
 	vkGetBufferMemoryRequirements(session->logical_device, *buffer, &requirements);
 	
@@ -829,8 +854,10 @@ void create_buffer( VkSession *session,
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = requirements.size;	
 	alloc_info.memoryTypeIndex = find_memory_type(session->physical_device, requirements.memoryTypeBits, properties);
-	result = vkAllocateMemory(session->logical_device, &alloc_info, NULL, buffer_memory);
-	assert(result == VK_SUCCESS);
+	if (vkAllocateMemory(session->logical_device, &alloc_info, NULL, buffer_memory) != VK_SUCCESS) {
+		printf("Could not allocate memory for buffer.\n");
+		exit(1);
+	}
 	vkBindBufferMemory(session->logical_device, *buffer, *buffer_memory, 0);
 }
 
@@ -846,12 +873,18 @@ void create_sync_objects(VkSession *session){
 	fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
 	for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
-		VkResult result = vkCreateSemaphore(session->logical_device, &semaphore_info, NULL, &session->image_available_semaphores[i]);
-		assert(result == VK_SUCCESS);
-		result = vkCreateSemaphore(session->logical_device, &semaphore_info, NULL, &session->render_finished_semaphores[i]);
-		assert(result == VK_SUCCESS);
-		result = vkCreateFence(session->logical_device, &fence_info, NULL, &session->in_flight_fences[i]);
-		assert(result == VK_SUCCESS);
+		if (vkCreateSemaphore(session->logical_device, &semaphore_info, NULL, &session->image_available_semaphores[i]) != VK_SUCCESS) {
+			printf("Could not create semaphore for available image.\n");
+			exit(1);
+		}
+		if (vkCreateSemaphore(session->logical_device, &semaphore_info, NULL, &session->render_finished_semaphores[i]) != VK_SUCCESS) {
+			printf("Could not create semaphore for render finished.\n");
+			exit(1);
+		}
+		if (vkCreateFence(session->logical_device, &fence_info, NULL, &session->in_flight_fences[i]) != VK_SUCCESS) {
+			printf("Could not create fence in flight.\n");
+			exit(1);
+		}
 	}
 }
 
@@ -923,7 +956,10 @@ void vulkan_session_draw_frame(VkSession *session, bool resized){
 		recreate_swapchain(session);
 		return;
 	}
-	assert(res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR);
+	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
+		printf("Could not acquire next image.\n");
+		exit(1);
+	}
 	vkResetFences(session->logical_device, 1, &session->in_flight_fences[current_frame]);
 	vkResetCommandBuffer(session->command_buffers[current_frame], 0);
 	record_command_buffer(session, image_index);
@@ -943,8 +979,10 @@ void vulkan_session_draw_frame(VkSession *session, bool resized){
 	VkSemaphore signal_semaphores[] = {session->render_finished_semaphores[current_frame]};
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = &signal_semaphores[0];
-	VkResult result = vkQueueSubmit(session->graphics_queue, 1, &submit_info,session->in_flight_fences[current_frame]);
-	assert(result == VK_SUCCESS);	
+	if (vkQueueSubmit(session->graphics_queue, 1, &submit_info, session->in_flight_fences[current_frame]) != VK_SUCCESS) {
+		printf("Could not submit queue.\n");
+		exit(1);
+	}
 	
 	VkPresentInfoKHR present_info = {0};
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1007,7 +1045,8 @@ void createDescriptorSetLayout(VkSession* session) {
 	}
 }
 
-void create_uniform_buffers(VkSession* session) {
+void create_uniform_buffers(VkSession* session)
+{
 	VkDeviceSize buffer_size = sizeof(UniformBufferObject);
 	session->uniform_buffers = malloc(sizeof(VkBuffer) * MAX_FRAMES_IN_FLIGHT);
 	session->uniform_buffers_memory = malloc(sizeof(VkDeviceMemory) * MAX_FRAMES_IN_FLIGHT);
